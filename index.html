@@ -23,7 +23,7 @@
     color: #111;
   }
 
-  .stage { width: min(92vw, 80vh); aspect-ratio: 1 / 1; }
+  .stage { width: min(92vw, 90vh); aspect-ratio: 1220 / 1050; }
 
   #meter {
     width: 100%;
@@ -86,14 +86,14 @@
 </head>
 <body>
 
-<div class="stage"><canvas id="meter" width="1050" height="1050"></canvas></div>
+<div class="stage"><canvas id="meter" width="1220" height="1050"></canvas></div>
 
 <div class="bar">
   <div class="status" id="status"><span>Click on the meter to place your dot</span></div>
   <button id="download" disabled>Download PNG</button>
   <button id="copy" disabled>Copy image</button>
 </div>
-<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2100×2100 PNG</div>
+<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2440×2100 PNG</div>
 
 <script>
 "use strict";
@@ -103,8 +103,9 @@ const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
 const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 
 /* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units).
-   PAD_* adds a cream margin on the top/right so exports aren't edge-to-edge. */
-const PAD_R = 50;
+   PAD_R equals the easter-egg strip on the left so the graph is centered;
+   PAD_T keeps the title clear of the top edge. */
+const PAD_R = 220;
 const PAD_T = 50;
 const MW = 1000 + PAD_R;
 const MH = 1000 + PAD_T;
@@ -174,8 +175,8 @@ function drawDot(ctx, p) {
   ctx.fillStyle = INK; ctx.fill();
 }
 
-function drawMeter(ctx, scale, dot, ghost, purpleAlpha) {
-  ctx.setTransform(scale, 0, 0, scale, 0, PAD_T * scale);
+function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
+  ctx.setTransform(sx, 0, 0, sy, 0, PAD_T * sy);
 
   ctx.fillStyle = "#f6ede8";
   ctx.fillRect(0, -PAD_T, MW, MH);
@@ -262,13 +263,12 @@ let animating = false;
 
 function redraw() {
   const dpr = window.devicePixelRatio || 1;
-  const size = Math.max(1, Math.round(canvas.clientWidth * dpr));
-  if (canvas.width !== size) {
-    canvas.width = size;
-    canvas.height = size;
-  }
+  const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
-  drawMeter(ctx, size / MW, dot, ghost, purpleAlpha);
+  drawMeter(ctx, w / MW, h / MH, dot, ghost, purpleAlpha);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
 }
 
@@ -391,7 +391,7 @@ function renderExportCanvas() {
   c.width = 2 * MW;
   c.height = 2 * MH;
   // The hidden corner exports only when the dot is placed on it.
-  drawMeter(c.getContext("2d"), 2, dot, null, inPurple(dot) ? 1 : 0);
+  drawMeter(c.getContext("2d"), 2, 2, dot, null, inPurple(dot) ? 1 : 0);
   return c;
 }
 
