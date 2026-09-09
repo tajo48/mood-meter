@@ -4,7 +4,7 @@ use std::thread;
 
 const INDEX: &str = include_str!("../index.html");
 
-const DEFAULT_HOST: &str = "127.0.0.1";
+const DEFAULT_HOST: &str = "0.0.0.0";
 const DEFAULT_PORT: u16 = 3002;
 
 const USAGE: &str = "\
@@ -17,7 +17,7 @@ ARGS:
 
 OPTIONS:
     -p, --port <PORT>   Port to listen on
-    -H, --host <HOST>   Address to bind (default: 127.0.0.1)
+    -H, --host <HOST>   Address to bind (default: 0.0.0.0, all interfaces)
     -h, --help          Print this help
 
 HOST/PORT environment variables provide the defaults; arguments win.";
@@ -32,7 +32,13 @@ fn main() -> std::io::Result<()> {
             return Err(err);
         }
     };
-    eprintln!("mood_meter listening on http://{host}:{port}");
+    // 0.0.0.0 listens on every interface; show the LAN IP as the URL to use.
+    let display_host = if host == "0.0.0.0" {
+        local_ip().unwrap_or(host)
+    } else {
+        host
+    };
+    eprintln!("mood_meter listening on http://{display_host}:{port}");
 
     for stream in listener.incoming() {
         match stream {
@@ -44,6 +50,14 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn local_ip() -> Option<String> {
+    // "Connect" a UDP socket to a public address (no packets sent) to learn
+    // which local IP faces the outside world.
+    let sock = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    sock.connect("8.8.8.8:80").ok()?;
+    Some(sock.local_addr().ok()?.ip().to_string())
 }
 
 fn parse_args() -> (String, u16) {
