@@ -12,7 +12,7 @@ const FONTS = "mood-fonts-" + VERSION;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest",
+  "./manifest.json",
   "./favicon.svg",
   "./favicon-32.png",
   "./apple-touch-icon.png",

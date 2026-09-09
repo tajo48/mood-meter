@@ -5,7 +5,7 @@ use std::thread;
 /* Every asset the site consists of, baked into the binary. */
 const INDEX: &[u8] = include_bytes!("../index.html");
 const SW_JS: &[u8] = include_bytes!("../sw.js");
-const MANIFEST: &[u8] = include_bytes!("../manifest.webmanifest");
+const MANIFEST: &[u8] = include_bytes!("../manifest.json");
 const FAVICON_SVG: &[u8] = include_bytes!("../favicon.svg");
 const FAVICON_PNG: &[u8] = include_bytes!("../favicon-32.png");
 const APPLE_TOUCH: &[u8] = include_bytes!("../apple-touch-icon.png");
