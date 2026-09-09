@@ -1,6 +1,9 @@
 [package]
-name = "mood_meter"
+name = "mood-meter"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+[[bin]]
+name = "mood-meter"
+path = "src/main.rs"

@@ -103,11 +103,11 @@ const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
 const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 
 /* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units).
-   PAD_* adds a cream margin on the top/left so exports aren't edge-to-edge. */
-const PAD_X = 50;
-const PAD_Y = 50;
-const MW = 1000 + PAD_X;
-const MH = 1000 + PAD_Y;
+   PAD_* adds a cream margin on the top/right so exports aren't edge-to-edge. */
+const PAD_R = 50;
+const PAD_T = 50;
+const MW = 1000 + PAD_R;
+const MH = 1000 + PAD_T;
 
 /* [name, x, y, w, h, fill, readout label] */
 const ZONES = [
@@ -119,6 +119,7 @@ const ZONES = [
   ["blue",     220, 490, 395, 385, "#a4b7d0", "It's so over"],
   ["blue-sm",  220, 750, 123, 125, "#7d93ab", "Mom would be sad"],
   ["green",    732, 490, 268, 385, "#98a67d", "We vibing"],
+  ["purple",     0, 875, 220, 125, "#4c4a86", "Hey guys I guess that's it"],
 ];
 
 /* [text, x, y, font, color, letterSpacing] */
@@ -174,12 +175,13 @@ function drawDot(ctx, p) {
 }
 
 function drawMeter(ctx, scale, dot, ghost, purpleAlpha) {
-  ctx.setTransform(scale, 0, 0, scale, PAD_X * scale, PAD_Y * scale);
+  ctx.setTransform(scale, 0, 0, scale, 0, PAD_T * scale);
 
   ctx.fillStyle = "#f6ede8";
-  ctx.fillRect(-PAD_X, -PAD_Y, MW, MH);
+  ctx.fillRect(0, -PAD_T, MW, MH);
 
   for (const z of ZONES) {
+    if (z[0] === "purple") continue; // hidden corner — drawn conditionally below
     ctx.fillStyle = z[5];
     ctx.fillRect(z[1], z[2], z[3], z[4]);
   }
@@ -219,8 +221,8 @@ function drawMeter(ctx, scale, dot, ghost, purpleAlpha) {
     }
   }
 
-  /* Hidden zone: "Hey guys I guess that's it". Blank until the pointer tries
-     to click that corner; never included in the exported image. */
+  /* Hidden zone: "Hey guys I guess that's it". Blank until the pointer or
+     the dot is on it; exports only when the dot is placed there. */
   if (purpleAlpha > 0) {
     ctx.globalAlpha = purpleAlpha;
     ctx.fillStyle = "#4c4a86";
@@ -257,7 +259,6 @@ let dragging = false;
 let flashTimer = 0;
 let purpleAlpha = 0;
 let animating = false;
-let purpleSelected = false;
 
 function redraw() {
   const dpr = window.devicePixelRatio || 1;
@@ -268,16 +269,14 @@ function redraw() {
   }
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
   drawMeter(ctx, size / MW, dot, ghost, purpleAlpha);
-  canvas.style.cursor = hover
-    ? (zoneAt(hover) ? "crosshair" : (inPurple(hover) && purpleAlpha > 0.4 ? "pointer" : "default"))
-    : "crosshair";
+  canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
 }
 
 function toMeter(e) {
   const r = canvas.getBoundingClientRect();
   return {
-    x: (e.clientX - r.left) / r.width * MW - PAD_X,
-    y: (e.clientY - r.top) / r.height * MH - PAD_Y,
+    x: (e.clientX - r.left) / r.width * MW,
+    y: (e.clientY - r.top) / r.height * MH - PAD_T,
   };
 }
 
@@ -289,15 +288,14 @@ function zoneAt(p) {
   return null;
 }
 
-/* The hidden corner lives outside the graph: blank until the pointer tries
-   to click it. Clicking it selects it so it exports with the image. */
+/* The hidden corner is a placeable zone like any other: blank until the
+   pointer (or the dot) is on it — a dot placed there keeps it revealed. */
 function inPurple(p) {
   return !!p && p.x >= 0 && p.x <= 220 && p.y >= 875 && p.y <= 1000;
 }
 
 function purpleTarget() {
-  if (purpleSelected) return 1;
-  return inPurple(hover) ? 0.75 : 0;
+  return inPurple(hover) || inPurple(dot) ? 1 : 0;
 }
 
 function kickAnimate() {
@@ -342,16 +340,6 @@ function flash(msg) {
 canvas.addEventListener("pointerdown", (e) => {
   const p = toMeter(e);
   hover = p;
-  if (inPurple(p)) {
-    // Clicking the revealed corner selects it so it exports; clicking again hides it.
-    purpleSelected = !purpleSelected;
-    flash(purpleSelected
-      ? "Easter egg selected — it will appear in the export"
-      : "Easter egg deselected — exports without it");
-    kickAnimate();
-    redraw();
-    return;
-  }
   if (!zoneAt(p)) {
     // Blank space isn't clickable.
     kickAnimate();
@@ -402,8 +390,8 @@ function renderExportCanvas() {
   const c = document.createElement("canvas");
   c.width = 2 * MW;
   c.height = 2 * MH;
-  // The hidden corner exports only once it's been clicked (selected).
-  drawMeter(c.getContext("2d"), 2, dot, null, purpleSelected ? 1 : 0);
+  // The hidden corner exports only when the dot is placed on it.
+  drawMeter(c.getContext("2d"), 2, dot, null, inPurple(dot) ? 1 : 0);
   return c;
 }
 

@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "mood_meter"
+name = "mood-meter"
 version = "0.1.0"
