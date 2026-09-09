@@ -109,21 +109,24 @@ const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
 const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 
 /* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units).
-   PAD_R equals the easter-egg strip on the left so the graph is centered;
-   PAD_T keeps the title clear of the top edge. */
+   The left/right margins match so the graph is centered, and every corner
+   of the meter hosts a hidden easter-egg zone; PAD_T keeps the title clear
+   of the top edge. */
 const PAD_R = 220;
 const PAD_T = 50;
 const MW = 1000 + PAD_R;
 const MH = 1000 + PAD_T;
 
 /* Readout axes: origin (0;0) at the "Mom would be sad" corner of the graph,
-   so the hidden easter-egg corner beyond it reads as negative values. */
+   so the hidden easter-egg corners beyond the graph read off-scale. */
 const GX0 = 220;   // meter x of pleasantness 0
 const GY0 = 875;   // meter y of energy 0
 const GX1 = 1000;  // meter x of pleasantness 100
 const GY1 = 97;    // meter y of energy 100
 
-/* [name, x, y, w, h, fill, readout label] */
+/* [name, x, y, w, h, fill, readout label] — the last four entries are the
+   hidden easter-egg corners: placeable like any other zone, but blank
+   until the pointer or the dot is on them. */
 const ZONES = [
   ["red",      220,  97, 395, 250, "#e78284", "Fuck it we ball"],
   ["tan",      615,  97, 385, 393, "#f2d5cf", "We are so fucking back"],
@@ -133,8 +136,24 @@ const ZONES = [
   ["blue",     220, 490, 395, 385, "#8caaee", "It's so over"],
   ["blue-sm",  220, 750, 123, 125, "#85c1dc", "Mom would be sad"],
   ["green",    732, 490, 268, 385, "#a6d189", "We vibing"],
-  ["purple",     0, 875, 220, 125, "#ca9ee6", "Hey guys I guess that's it"],
+  ["tl",         0, -50, 220, 147, "#ea999c", "No thoughts, just ball"],
+  ["tr",      1000, -50, 220, 147, "#f4b8e4", "Where are the brakes?"],
+  ["bl",         0, 875, 220, 125, "#ca9ee6", "Hey guys I guess that's it"],
+  ["br",      1000, 875, 220, 125, "#babbf1", "We sleeping"],
 ];
+
+const HIDDEN = new Set(["tl", "tr", "bl", "br"]);
+
+/* Caption lines per hidden corner: [text, x, y] in meter units. */
+const CORNER_TEXTS = {
+  tl: [["No thoughts", 110, 7],
+       ["just ball", 110, 40]],
+  tr: [["Where are", 1110, 7],
+       ["the brakes?", 1110, 40]],
+  bl: [["Hey guys", 110, 914.6],
+       ["I guess that's it", 110, 948.4]],
+  br: [["We sleeping", 1110, 905]],
+};
 
 /* [text, x, y, font, color, letterSpacing] */
 const TEXTS = [
@@ -188,14 +207,14 @@ function drawDot(ctx, p) {
   ctx.fillStyle = CRUST; ctx.fill();
 }
 
-function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
+function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz) {
   ctx.setTransform(sx, 0, 0, sy, 0, PAD_T * sy);
 
   ctx.fillStyle = "#303446";
   ctx.fillRect(0, -PAD_T, MW, MH);
 
   for (const z of ZONES) {
-    if (z[0] === "purple") continue; // hidden corner — drawn conditionally below
+    if (HIDDEN.has(z[0])) continue; // hidden corners — drawn conditionally below
     ctx.fillStyle = z[5];
     ctx.fillRect(z[1], z[2], z[3], z[4]);
   }
@@ -235,19 +254,30 @@ function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
     }
   }
 
-  /* Hidden zone: "Hey guys I guess that's it". Blank until the pointer or
-     the dot is on it; exports only when the dot is placed there. */
-  if (purpleAlpha > 0) {
-    ctx.globalAlpha = purpleAlpha;
-    ctx.fillStyle = "#ca9ee6";
-    ctx.fillRect(0, 875, 220, 125);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "700 27px Arial, Helvetica, sans-serif";
+  /* Hidden corners: blank until the pointer or the dot is on them; they
+     export only when the dot is placed on them. While the sleeping corner
+     (br) is revealed, its z's drift up in a loop. */
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.letterSpacing = "0px";
+  for (const z of ZONES) {
+    if (!HIDDEN.has(z[0])) continue;
+    const a = alphas[z[0]] || 0;
+    if (a <= 0) continue;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = z[5];
+    ctx.fillRect(z[1], z[2], z[3], z[4]);
     ctx.fillStyle = INK_ZONE;
-    ctx.letterSpacing = "0px";
-    ctx.fillText("Hey guys", 110, 914.6);
-    ctx.fillText("I guess that's it", 110, 948.4);
+    ctx.font = "700 27px Arial, Helvetica, sans-serif";
+    for (const [t, x, y] of CORNER_TEXTS[z[0]]) ctx.fillText(t, x, y);
+    if (z[0] === "br") { // sleeping corner: drifting z's
+      for (let i = 0; i < 3; i++) {
+        const p = (zzz + i / 3) % 1;
+        ctx.globalAlpha = a * Math.sin(Math.PI * p);
+        ctx.font = "italic 700 " + Math.round(24 - 10 * p) + "px Arial, Helvetica, sans-serif";
+        ctx.fillText("z", 1100 + 60 * p, 975 - 35 * p);
+      }
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -271,8 +301,10 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let flashTimer = 0;
-let purpleAlpha = 0;
 let animating = false;
+let zzz = 0; // drift phase for the sleeping corner's z's
+const hiddenAlpha = {};
+for (const k of HIDDEN) hiddenAlpha[k] = 0;
 
 function redraw() {
   const dpr = window.devicePixelRatio || 1;
@@ -281,7 +313,7 @@ function redraw() {
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
-  drawMeter(ctx, w / MW, h / MH, dot, ghost, purpleAlpha);
+  drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
 }
 
@@ -294,6 +326,7 @@ function toMeter(e) {
 }
 
 function zoneAt(p) {
+  if (!p) return null;
   for (let i = ZONES.length - 1; i >= 0; i--) {
     const z = ZONES[i];
     if (p.x >= z[1] && p.x <= z[1] + z[3] && p.y >= z[2] && p.y <= z[2] + z[4]) return z;
@@ -301,29 +334,37 @@ function zoneAt(p) {
   return null;
 }
 
-/* The hidden corner is a placeable zone like any other: blank until the
-   pointer (or the dot) is on it — a dot placed there keeps it revealed. */
-function inPurple(p) {
-  return !!p && p.x >= 0 && p.x <= 220 && p.y >= 875 && p.y <= 1000;
+/* The hidden corners are placeable zones like any other: blank until the
+   pointer (or the dot) is on them — a dot placed there keeps them revealed. */
+function hiddenTarget(key) {
+  const h = zoneAt(hover);
+  const d = zoneAt(dot);
+  return (h && h[0] === key) || (d && d[0] === key) ? 1 : 0;
 }
 
-function purpleTarget() {
-  return inPurple(hover) || inPurple(dot) ? 1 : 0;
+function needsFrame() {
+  for (const k of HIDDEN) {
+    if (hiddenAlpha[k] !== hiddenTarget(k)) return true;
+  }
+  return hiddenAlpha.br > 0.01; // z's keep drifting while the sleeping corner is up
 }
 
 function kickAnimate() {
-  if (!animating && purpleAlpha !== purpleTarget()) {
+  if (!animating && needsFrame()) {
     animating = true;
     requestAnimationFrame(animate);
   }
 }
 
 function animate() {
-  const target = purpleTarget();
-  purpleAlpha += (target - purpleAlpha) * 0.25;
-  if (Math.abs(target - purpleAlpha) < 0.01) purpleAlpha = target;
+  for (const k of HIDDEN) {
+    const t = hiddenTarget(k);
+    hiddenAlpha[k] += (t - hiddenAlpha[k]) * 0.25;
+    if (Math.abs(t - hiddenAlpha[k]) < 0.01) hiddenAlpha[k] = t;
+  }
+  zzz = (zzz + 0.008) % 1;
   redraw();
-  if (purpleAlpha !== target) {
+  if (needsFrame()) {
     requestAnimationFrame(animate);
   } else {
     animating = false;
@@ -403,8 +444,11 @@ function renderExportCanvas() {
   const c = document.createElement("canvas");
   c.width = 2 * MW;
   c.height = 2 * MH;
-  // The hidden corner exports only when the dot is placed on it.
-  drawMeter(c.getContext("2d"), 2, 2, dot, null, inPurple(dot) ? 1 : 0);
+  // The hidden corners export only when the dot is placed on them.
+  const dz = zoneAt(dot);
+  const alphas = {};
+  for (const k of HIDDEN) alphas[k] = dz && dz[0] === k ? 1 : 0;
+  drawMeter(c.getContext("2d"), 2, 2, dot, null, alphas, zzz);
   return c;
 }
 
