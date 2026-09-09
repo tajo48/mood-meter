@@ -611,39 +611,23 @@ redraw();
 
 /* ---------- install prompt ---------- */
 
-/* A quiet pill at the bottom edge: shows only when the app is installable
-   and not installed yet, and stays gone for a month once dismissed. */
+/* A quiet pill at the bottom edge: shows whenever the app is installable
+   and not installed, and keeps showing — only an actual install hides it
+   for good (the × hides it for the current visit). */
 
 const pill = document.getElementById("installPill");
 const installBtn = document.getElementById("installAccept");
 const installClose = document.getElementById("installClose");
 let deferredPrompt = null;
 let pillTimer = 0;
-
-const DISMISS_KEY = "installDismissedAt";
-const DISMISS_MS = 30 * 24 * 60 * 60 * 1000;
+let pillDismissed = false; // per-visit only: set by × or a completed install
 
 function isInstalled() {
   return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 }
 
-function isDismissed() {
-  try {
-    const t = Number(localStorage.getItem(DISMISS_KEY));
-    return t > 0 && Date.now() - t < DISMISS_MS;
-  } catch {
-    return false;
-  }
-}
-
-function setDismissed() {
-  try {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  } catch {}
-}
-
 function showPill() {
-  if (isInstalled() || isDismissed()) return;
+  if (isInstalled() || pillDismissed) return;
   clearTimeout(pillTimer);
   pill.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => pill.classList.add("show")));
@@ -671,11 +655,15 @@ window.addEventListener("beforeinstallprompt", (e) => {
 
 window.addEventListener("appinstalled", () => {
   deferredPrompt = null;
+  pillDismissed = true;
   hidePill();
 });
 
 window.matchMedia("(display-mode: standalone)").addEventListener("change", (e) => {
-  if (e.matches) hidePill();
+  if (e.matches) {
+    pillDismissed = true;
+    hidePill();
+  }
 });
 
 installBtn.addEventListener("click", async () => {
@@ -683,21 +671,19 @@ installBtn.addEventListener("click", async () => {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     deferredPrompt = null;
-    hidePill();
-    if (outcome !== "accepted") setDismissed();
-  } else {
-    // iOS Safari has no install API; point the way, then fade out.
-    installBtn.textContent = "Share → Add to Home Screen";
-    clearTimeout(pillTimer);
-    pillTimer = setTimeout(() => {
-      setDismissed();
+    if (outcome === "accepted") {
+      pillDismissed = true;
       hidePill();
-    }, 4000);
+    }
+    // Declined: the pill stays put — the user may change their mind.
+  } else {
+    // iOS Safari has no install API; spell out how, and keep it spelled out.
+    installBtn.textContent = "Share → Add to Home Screen";
   }
 });
 
 installClose.addEventListener("click", () => {
-  setDismissed();
+  pillDismissed = true; // gone for this visit only
   hidePill();
 });
 
