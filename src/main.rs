@@ -2,7 +2,18 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-const INDEX: &str = include_str!("../index.html");
+/* Every asset the site consists of, baked into the binary. */
+const INDEX: &[u8] = include_bytes!("../index.html");
+const SW_JS: &[u8] = include_bytes!("../sw.js");
+const MANIFEST: &[u8] = include_bytes!("../manifest.webmanifest");
+const FAVICON_SVG: &[u8] = include_bytes!("../favicon.svg");
+const FAVICON_PNG: &[u8] = include_bytes!("../favicon-32.png");
+const APPLE_TOUCH: &[u8] = include_bytes!("../apple-touch-icon.png");
+const ICON_192: &[u8] = include_bytes!("../icon-192.png");
+const ICON_512: &[u8] = include_bytes!("../icon-512.png");
+const ICON_192_MASKABLE: &[u8] = include_bytes!("../icon-192-maskable.png");
+const ICON_512_MASKABLE: &[u8] = include_bytes!("../icon-512-maskable.png");
+const NOT_FOUND: &[u8] = b"not found\n";
 
 const DEFAULT_HOST: &str = "0.0.0.0";
 const DEFAULT_PORT: u16 = 3002;
@@ -129,11 +140,26 @@ fn handle(mut stream: TcpStream) {
     let method = parts.next().unwrap_or_default();
     let path = parts.next().unwrap_or_default();
 
-    let (status, content_type, body) = match (method, path) {
-        ("GET", "/") | ("GET", "/index.html") | ("HEAD", "/") | ("HEAD", "/index.html") => {
-            ("200 OK", "text/html; charset=utf-8", INDEX)
+    let (status, content_type, body): (&str, &str, &[u8]) = if method == "GET" || method == "HEAD" {
+        match path {
+            "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", INDEX),
+            "/sw.js" => ("200 OK", "text/javascript; charset=utf-8", SW_JS),
+            "/manifest.webmanifest" => (
+                "200 OK",
+                "application/manifest+json; charset=utf-8",
+                MANIFEST,
+            ),
+            "/favicon.svg" => ("200 OK", "image/svg+xml", FAVICON_SVG),
+            "/favicon-32.png" => ("200 OK", "image/png", FAVICON_PNG),
+            "/apple-touch-icon.png" => ("200 OK", "image/png", APPLE_TOUCH),
+            "/icon-192.png" => ("200 OK", "image/png", ICON_192),
+            "/icon-512.png" => ("200 OK", "image/png", ICON_512),
+            "/icon-192-maskable.png" => ("200 OK", "image/png", ICON_192_MASKABLE),
+            "/icon-512-maskable.png" => ("200 OK", "image/png", ICON_512_MASKABLE),
+            _ => ("404 Not Found", "text/plain; charset=utf-8", NOT_FOUND),
         }
-        _ => ("404 Not Found", "text/plain; charset=utf-8", "not found\n"),
+    } else {
+        ("404 Not Found", "text/plain; charset=utf-8", NOT_FOUND)
     };
 
     let response = format!(
@@ -142,7 +168,7 @@ fn handle(mut stream: TcpStream) {
     );
     let _ = stream.write_all(response.as_bytes());
     if method != "HEAD" {
-        let _ = stream.write_all(body.as_bytes());
+        let _ = stream.write_all(body);
     }
     let _ = stream.flush();
 }
