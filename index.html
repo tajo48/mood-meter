@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>The Mood Meter</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
@@ -21,17 +21,29 @@
   body {
     background: #232634;
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    justify-content: safe center; /* don't clip the top when overflowing */
     gap: 16px;
-    padding: 16px;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     font-family: Verdana, "DejaVu Sans", Geneva, sans-serif;
     color: #c6d0f5;
+    touch-action: manipulation; /* no double-tap zoom; the canvas opts out fully */
   }
 
-  .stage { width: min(92vw, 90vh); aspect-ratio: 1220 / 1050; }
+  /* Framed like the status panel, so meter, status and buttons match. */
+  .stage {
+    width: min(92vw, 90vh);
+    width: min(92vw, 90dvh);
+    aspect-ratio: 1220 / 1050;
+    background: #303446;
+    border: 2px solid #51576d;
+    border-radius: 6px;
+    overflow: hidden;
+  }
 
   #meter {
     width: 100%;
@@ -40,6 +52,7 @@
     touch-action: none;
     cursor: crosshair;
     user-select: none;
+    -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -83,13 +96,15 @@
     text-transform: uppercase;
     background: #8caaee;
     color: #292c3c;
-    border: 2px solid #8caaee;
+    border: 2px solid #51576d;
     border-radius: 6px;
     padding: 10px 22px 7px;
     cursor: pointer;
+    touch-action: manipulation;
   }
-  button:hover:not(:disabled) { background: transparent; color: #8caaee; }
+  button:hover:not(:disabled) { background: transparent; border-color: #8caaee; color: #8caaee; }
   button:disabled { opacity: 0.35; cursor: default; }
+  button:focus-visible { outline: 2px solid #8caaee; outline-offset: 2px; }
 
   .hint { font-size: 12px; color: #a5adce; text-align: center; max-width: 92vw; }
 
@@ -97,14 +112,14 @@
   .install-pill {
     position: fixed;
     left: 50%;
-    bottom: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     transform: translate(-50%, 10px);
     display: flex;
     align-items: center;
     gap: 2px;
     padding: 4px 6px 4px 14px;
     background: rgba(65, 69, 89, 0.92);
-    border: 1px solid #51576d;
+    border: 2px solid #51576d;
     border-radius: 999px;
     box-shadow: 0 6px 24px rgba(23, 26, 35, 0.5);
     -webkit-backdrop-filter: blur(8px);
@@ -151,7 +166,7 @@
 <div class="stage"><canvas id="meter" width="1220" height="1050"></canvas></div>
 
 <div class="bar">
-  <div class="status" id="status"><span>Click on the meter to place your dot</span></div>
+  <div class="status" id="status"><span>Click on the meter to place your dot</span><span class="mood">&nbsp;</span></div>
   <button id="download" disabled>Download PNG</button>
   <button id="copy" disabled>Copy image</button>
 </div>
@@ -282,10 +297,10 @@ const ARROWS = [
      [[760, 910], [739, 897.5], [739, 922.5]]]],
 ];
 
-function drawDot(ctx, p) {
-  ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
+function drawDot(ctx, p, r) {
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
   ctx.fillStyle = INK; ctx.fill();
-  ctx.beginPath(); ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(p.x, p.y, r * 2 / 3, 0, Math.PI * 2);
   ctx.fillStyle = CRUST; ctx.fill();
 }
 
@@ -376,10 +391,10 @@ function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz, credit) {
 
   if (ghost) {
     ctx.globalAlpha = 0.35;
-    drawDot(ctx, ghost);
+    drawDot(ctx, ghost, dotR);
     ctx.globalAlpha = 1;
   }
-  if (dot) drawDot(ctx, dot);
+  if (dot) drawDot(ctx, dot, dotR);
 }
 
 /* ---------- app ---------- */
@@ -393,6 +408,7 @@ const copyBtn = document.getElementById("copy");
 let dot = null;
 let hover = null;
 let dragging = false;
+let dotR = 30; // dot radius in meter units; grows on small screens (see redraw)
 let flashTimer = 0;
 let animating = false;
 let zzz = 0; // drift phase for the sleeping corner's z's
@@ -405,6 +421,8 @@ function redraw() {
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
+  /* Keep the dot plainly visible on phones: at least 15 css px of radius. */
+  dotR = Math.max(30, (15 * dpr) / (w / MW));
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
   drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
@@ -416,6 +434,19 @@ function toMeter(e) {
     x: (e.clientX - r.left) / r.width * MW,
     y: (e.clientY - r.top) / r.height * MH - PAD_T,
   };
+}
+
+/* Touch pointing: the finger would cover the dot, so the effective point
+   rides a little above it; clamped so the dot never leaves the canvas. */
+const TOUCH_LIFT_PX = 40;
+
+function toPoint(e) {
+  const p = toMeter(e);
+  if (e.pointerType === "touch") {
+    const lift = (TOUCH_LIFT_PX * MW) / Math.max(1, canvas.clientWidth);
+    p.y = Math.max(p.y - lift, -10);
+  }
+  return p;
 }
 
 function zoneAt(p) {
@@ -464,27 +495,29 @@ function animate() {
   }
 }
 
+/* The status box always renders two lines, so its height never changes
+   between the empty, placed, and flash states. */
 function updateStatus() {
   downloadBtn.disabled = copyBtn.disabled = !dot;
-  if (!dot) {
-    statusEl.innerHTML = "<span>Click on the meter to place your dot</span>";
-    return;
+  let top = "Click on the meter to place your dot";
+  let mood = "\u00a0";
+  if (dot) {
+    const s = statsOf(dot);
+    top = "Pleasantness " + s.pleasant + "% · Energy " + s.energy + "%";
+    const z = zoneAt(dot);
+    if (z) mood = z[6];
   }
-  const { pleasant, energy } = statsOf(dot);
-  const z = zoneAt(dot);
-  statusEl.innerHTML =
-    "<span>Pleasantness " + pleasant + "% · Energy " + energy + "%</span>" +
-    (z ? "<span class='mood'>" + z[6] + "</span>" : "");
+  statusEl.innerHTML = "<span>" + top + "</span><span class='mood'>" + mood + "</span>";
 }
 
 function flash(msg) {
-  statusEl.innerHTML = "<span>" + msg + "</span>";
+  statusEl.innerHTML = "<span>" + msg + "</span><span class='mood'>\u00a0</span>";
   clearTimeout(flashTimer);
   flashTimer = setTimeout(updateStatus, 2500);
 }
 
 canvas.addEventListener("pointerdown", (e) => {
-  const p = toMeter(e);
+  const p = toPoint(e);
   hover = p;
   if (!zoneAt(p)) {
     // Blank space isn't clickable.
@@ -502,7 +535,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  const p = toMeter(e);
+  const p = toPoint(e);
   hover = p;
   if (dragging && zoneAt(p)) {
     dot = p;
@@ -514,7 +547,7 @@ canvas.addEventListener("pointermove", (e) => {
 
 canvas.addEventListener("pointerup", (e) => {
   dragging = false;
-  hover = e.pointerType === "mouse" ? toMeter(e) : null;
+  hover = e.pointerType === "mouse" ? toPoint(e) : null;
   kickAnimate();
   redraw();
 });
@@ -531,6 +564,8 @@ canvas.addEventListener("pointercancel", () => {
   kickAnimate();
   redraw();
 });
+
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function renderExportCanvas() {
   const c = document.createElement("canvas");
