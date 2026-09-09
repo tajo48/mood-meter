@@ -84,16 +84,6 @@
   button:disabled { opacity: 0.35; cursor: default; }
 
   .hint { font-size: 12px; color: #a5adce; text-align: center; max-width: 92vw; }
-
-  a.site {
-    font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
-    font-size: 15px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #8caaee;
-    text-decoration: none;
-  }
-  a.site:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -106,7 +96,6 @@
   <button id="copy" disabled>Copy image</button>
 </div>
 <div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2440×2100 PNG</div>
-<a class="site" href="https://tajo48.github.io/mood-meter/">tajo48.github.io/mood-meter</a>
 
 <script>
 "use strict";
@@ -134,6 +123,24 @@ const GX0 = 220;   // meter x of pleasantness 0
 const GY0 = 875;   // meter y of energy 0
 const GX1 = 1000;  // meter x of pleasantness 100
 const GY1 = 97;    // meter y of energy 100
+
+function statsOf(p) {
+  return {
+    pleasant: Math.round((p.x - GX0) / (GX1 - GX0) * 100),
+    energy: Math.round((GY0 - p.y) / (GY0 - GY1) * 100),
+  };
+}
+
+/* Download name carries the placement stats and a local timestamp,
+   e.g. mood-meter_2026-09-09_14-30_pleasant-67_energy-42.png. */
+function exportFileName() {
+  const s = statsOf(dot);
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+    + "_" + pad(d.getHours()) + "-" + pad(d.getMinutes());
+  return "mood-meter_" + stamp + "_pleasant-" + s.pleasant + "_energy-" + s.energy + ".png";
+}
 
 /* [name, x, y, w, h, fill, readout label] — the last four entries are the
    hidden easter-egg corners: placeable like any other zone, but blank
@@ -218,7 +225,7 @@ function drawDot(ctx, p) {
   ctx.fillStyle = CRUST; ctx.fill();
 }
 
-function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz) {
+function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz, credit) {
   ctx.setTransform(sx, 0, 0, sy, 0, PAD_T * sy);
 
   ctx.fillStyle = "#303446";
@@ -263,6 +270,17 @@ function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz) {
       ctx.closePath();
       ctx.fill();
     }
+  }
+
+  /* Site credit — exports only, never shown on the live page. */
+  if (credit) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "22px " + BEBAS;
+    ctx.fillStyle = BLUE;
+    ctx.letterSpacing = "2px";
+    ctx.fillText("tajo48.github.io/mood-meter", 610, 972);
+    ctx.letterSpacing = "0px";
   }
 
   /* Hidden corners: blank until the pointer or the dot is on them; they
@@ -388,8 +406,7 @@ function updateStatus() {
     statusEl.innerHTML = "<span>Click on the meter to place your dot</span>";
     return;
   }
-  const pleasant = Math.round((dot.x - GX0) / (GX1 - GX0) * 100);
-  const energy = Math.round((GY0 - dot.y) / (GY0 - GY1) * 100);
+  const { pleasant, energy } = statsOf(dot);
   const z = zoneAt(dot);
   statusEl.innerHTML =
     "<span>Pleasantness " + pleasant + "% · Energy " + energy + "%</span>" +
@@ -459,7 +476,7 @@ function renderExportCanvas() {
   const dz = zoneAt(dot);
   const alphas = {};
   for (const k of HIDDEN) alphas[k] = dz && dz[0] === k ? 1 : 0;
-  drawMeter(c.getContext("2d"), 2, 2, dot, null, alphas, zzz);
+  drawMeter(c.getContext("2d"), 2, 2, dot, null, alphas, zzz, true);
   return c;
 }
 
@@ -468,7 +485,7 @@ downloadBtn.addEventListener("click", () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "mood-meter.png";
+    a.download = exportFileName();
     document.body.appendChild(a);
     a.click();
     a.remove();
