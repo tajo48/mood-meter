@@ -418,7 +418,10 @@ const copyBtn = document.getElementById("copy");
 let dot = null;
 let hover = null;
 let dragging = false;
+let dragTarget = null; // where the dot glides toward while/after dragging
 let dotR = 30; // dot radius in meter units; grows on small screens (see redraw)
+let lastFrameTs = 0;
+let glideStuck = 0;
 let flashTimer = 0;
 let animating = false;
 let zzz = 0; // drift phase for the sleeping corner's z's
@@ -447,14 +450,17 @@ function toMeter(e) {
 }
 
 /* Touch pointing: the finger would cover the dot, so the effective point
-   rides a little above it; clamped so the dot never leaves the canvas. */
+   rides a little above it. The lift fades out near the top and bottom
+   edges so the hidden corner zones stay reachable by touch. */
 const TOUCH_LIFT_PX = 40;
 
 function toPoint(e) {
   const p = toMeter(e);
   if (e.pointerType === "touch") {
     const lift = (TOUCH_LIFT_PX * MW) / Math.max(1, canvas.clientWidth);
-    p.y = Math.max(p.y - lift, -10);
+    const fromTop = Math.max(0, p.y + PAD_T);
+    const fromBottom = Math.max(0, MH - PAD_T - p.y);
+    p.y -= lift * Math.min(1, Math.min(fromTop, fromBottom) / lift);
   }
   return p;
 }
@@ -468,6 +474,64 @@ function zoneAt(p) {
   return null;
 }
 
+/* Zone spans along one axis, at a fixed coordinate on the other axis. */
+function spansAt(v, axis) {
+  const out = [];
+  for (const z of ZONES) {
+    const inside = axis === "x" ? v >= z[2] && v <= z[2] + z[4] : v >= z[1] && v <= z[1] + z[3];
+    if (inside) out.push(axis === "x" ? [z[1], z[1] + z[3]] : [z[2], z[2] + z[4]]);
+  }
+  return out;
+}
+
+function mergedSpans(spans) {
+  spans.sort((a, b) => a[0] - b[0]);
+  const out = [];
+  for (const s of spans) {
+    const last = out[out.length - 1];
+    if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+    else out.push([s[0], s[1]]);
+  }
+  return out;
+}
+
+/* How far `from` can move toward `to` without leaving the spans. */
+function slideWithin(from, to, spans) {
+  for (const [a, b] of spans) {
+    if (from >= a && from <= b) return Math.min(Math.max(to, a), b);
+  }
+  return from;
+}
+
+/* One frame of the dot chasing the drag target: instead of freezing in
+   blank space and snapping when the pointer re-enters a zone, it glides
+   along tile edges — and never leaves the tiles. */
+const GLIDE_SPEED = 5000; // meter units per second
+const GLIDE_PULL = 0.5;   // fraction of the remaining distance per frame
+
+function glideStep(dt) {
+  const t = dragTarget;
+  if (!t || !dot) return false;
+  const dx = t.x - dot.x;
+  const dy = t.y - dot.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 0.75) return false;
+  const step = Math.min(dist, Math.max(2, dist * GLIDE_PULL), (GLIDE_SPEED * dt) / 1000);
+  let tx = dot.x + (dx / dist) * step;
+  let ty = dot.y + (dy / dist) * step;
+  // Slide the dominant axis first so diagonals glide around corners.
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    tx = slideWithin(dot.x, tx, mergedSpans(spansAt(dot.y, "x")));
+    ty = slideWithin(dot.y, ty, mergedSpans(spansAt(tx, "y")));
+  } else {
+    ty = slideWithin(dot.y, ty, mergedSpans(spansAt(dot.x, "y")));
+    tx = slideWithin(dot.x, tx, mergedSpans(spansAt(ty, "x")));
+  }
+  if (tx === dot.x && ty === dot.y) return false;
+  dot = { x: tx, y: ty };
+  return true;
+}
+
 /* The hidden corners are placeable zones like any other: blank until the
    pointer (or the dot) is on them — a dot placed there keeps them revealed. */
 function hiddenTarget(key) {
@@ -477,6 +541,9 @@ function hiddenTarget(key) {
 }
 
 function needsFrame() {
+  if (dragTarget && dot && Math.hypot(dragTarget.x - dot.x, dragTarget.y - dot.y) >= 0.75) {
+    return true; // the dot is still gliding toward its target
+  }
   for (const k of HIDDEN) {
     if (hiddenAlpha[k] !== hiddenTarget(k)) return true;
   }
@@ -490,7 +557,16 @@ function kickAnimate() {
   }
 }
 
-function animate() {
+function animate(ts) {
+  const dt = lastFrameTs ? Math.min(50, ts - lastFrameTs) : 16.7;
+  lastFrameTs = ts;
+
+  const moved = glideStep(dt);
+  if (moved) glideStuck = 0;
+  else if (dragTarget && dot) glideStuck++;
+  else glideStuck = 0;
+  if (glideStuck > 40) dragTarget = null; // safety: stop chasing a dead end
+
   for (const k of HIDDEN) {
     const t = hiddenTarget(k);
     hiddenAlpha[k] += (t - hiddenAlpha[k]) * 0.25;
@@ -498,15 +574,19 @@ function animate() {
   }
   zzz = (zzz + 0.008) % 1;
   redraw();
+  if (moved) updateStatus();
   if (needsFrame()) {
     requestAnimationFrame(animate);
   } else {
     animating = false;
+    lastFrameTs = 0;
   }
 }
 
 /* The status box always renders two lines, so its height never changes
    between the empty, placed, and flash states. */
+let lastStatusHTML = "";
+
 function updateStatus() {
   downloadBtn.disabled = copyBtn.disabled = !dot;
   let top = "Click on the meter to place your dot";
@@ -517,11 +597,16 @@ function updateStatus() {
     const z = zoneAt(dot);
     if (z) mood = z[6];
   }
-  statusEl.innerHTML = "<span>" + top + "</span><span class='mood'>" + mood + "</span>";
+  const html = "<span>" + top + "</span><span class='mood'>" + mood + "</span>";
+  if (html === lastStatusHTML) return; // glide frames often change nothing
+  lastStatusHTML = html;
+  statusEl.innerHTML = html;
 }
 
 function flash(msg) {
-  statusEl.innerHTML = "<span>" + msg + "</span><span class='mood'>\u00a0</span>";
+  const html = "<span>" + msg + "</span><span class='mood'>\u00a0</span>";
+  lastStatusHTML = html;
+  statusEl.innerHTML = html;
   clearTimeout(flashTimer);
   flashTimer = setTimeout(updateStatus, 2500);
 }
@@ -531,6 +616,7 @@ canvas.addEventListener("pointerdown", (e) => {
   hover = p;
   if (!zoneAt(p)) {
     // Blank space isn't clickable.
+    dragTarget = null;
     kickAnimate();
     redraw();
     return;
@@ -539,6 +625,7 @@ canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
   dragging = true;
   dot = p;
+  dragTarget = p;
   redraw();
   updateStatus();
   kickAnimate();
@@ -547,16 +634,14 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   const p = toPoint(e);
   hover = p;
-  if (dragging && zoneAt(p)) {
-    dot = p;
-    updateStatus();
-  }
+  if (dragging) dragTarget = p; // the dot glides after it in animate()
   kickAnimate();
   redraw();
 });
 
 canvas.addEventListener("pointerup", (e) => {
   dragging = false;
+  // dragTarget stays behind, so the dot finishes its glide after release.
   hover = e.pointerType === "mouse" ? toPoint(e) : null;
   kickAnimate();
   redraw();
@@ -570,6 +655,7 @@ canvas.addEventListener("pointerleave", () => {
 
 canvas.addEventListener("pointercancel", () => {
   dragging = false;
+  dragTarget = null;
   hover = null;
   kickAnimate();
   redraw();
