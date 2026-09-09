@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Mood Meter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #f6ede8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+    font-family: Verdana, "DejaVu Sans", Geneva, sans-serif;
+    color: #111;
+  }
+
+  .stage { width: min(92vw, 80vh); aspect-ratio: 1 / 1; }
+
+  #meter {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 300px;
+    max-width: 92vw;
+    padding: 8px 18px;
+    background: #111;
+    color: #f6ede8;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+    user-select: none;
+  }
+  .status .mood {
+    font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  button {
+    font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: #111;
+    color: #f6ede8;
+    border: 2px solid #111;
+    border-radius: 6px;
+    padding: 10px 22px 7px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: transparent; color: #111; }
+  button:disabled { opacity: 0.35; cursor: default; }
+
+  .hint { font-size: 12px; opacity: 0.7; text-align: center; max-width: 92vw; }
+</style>
+</head>
+<body>
+
+<div class="stage"><canvas id="meter" width="1000" height="1000"></canvas></div>
+
+<div class="bar">
+  <div class="status" id="status"><span>Click on the meter to place your dot</span></div>
+  <button id="download" disabled>Download PNG</button>
+  <button id="copy" disabled>Copy image</button>
+</div>
+<div class="hint">Click or drag on the meter to place the dot — exports a 2000×2000 PNG</div>
+
+<script>
+"use strict";
+
+const INK = "#111";
+const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
+const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
+
+/* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units). */
+
+/* [name, x, y, w, h, fill, readout label] */
+const ZONES = [
+  ["red",      220,  97, 395, 250, "#8a2f27", "Fuck it we ball"],
+  ["tan",      615,  97, 385, 393, "#f0cc84", "We are so fucking back"],
+  ["yellow",   870,  97, 130, 121, "#f6e97a", "Lets Fucking Goooooooo"],
+  ["orange-h", 220, 347, 512, 144, "#f3a26c", "It is what it is"],
+  ["orange-v", 615, 490, 117, 385, "#f3a26c", "It is what it is"],
+  ["blue",     220, 490, 395, 385, "#a4b7d0", "It's so over"],
+  ["blue-sm",  220, 750, 123, 125, "#7d93ab", "Mom would be sad"],
+  ["green",    732, 490, 268, 385, "#98a67d", "We vibing"],
+  ["purple",     0, 875, 220, 125, "#4c4a86", "Hey guys I guess that's it"],
+];
+
+/* [text, x, y, font, color, letterSpacing] */
+const TEXTS = [
+  ["THE MOOD METER", 600, 38, "82px " + BEBAS, INK, 0],
+
+  ["Fuck it", 417.5, 181.8, "70px " + VERD, INK, 0],
+  ["we ball", 417.5, 262.3, "70px " + VERD, INK, 0],
+
+  ["LETS FUCKING", 935, 146.1, "13.5px " + VERD, INK, 0],
+  ["GOOOOOOO",    935, 165.0, "13.5px " + VERD, INK, 0],
+
+  ["It's so", 417.5, 587.9, "78px " + VERD, INK, 0],
+  ["over",    417.5, 677.6, "78px " + VERD, INK, 0],
+
+  ["Mom would", 281.5, 801.3, "600 16px " + VERD, INK, 0],
+  ["be sad",    281.5, 823.7, "600 16px " + VERD, INK, 0],
+
+  ["We",     866, 586.7, "76px " + VERD, INK, 0],
+  ["vibing", 866, 674.1, "76px " + VERD, INK, 0],
+
+  ["Hey guys",          110, 914.6, "700 27px Arial, Helvetica, sans-serif", "#0d0d1a", 0],
+  ["I guess that's it", 110, 948.4, "700 27px Arial, Helvetica, sans-serif", "#0d0d1a", 0],
+
+  ["HIGH",       140, 220.5, "39px " + BEBAS, INK, 0],
+  ["ENERGY",     140, 261.5, "39px " + BEBAS, INK, 0],
+  ["LOW",        140, 735.5, "39px " + BEBAS, INK, 0],
+  ["ENERGY",     140, 776.5, "39px " + BEBAS, INK, 0],
+  ["UNPLEASANT", 345, 906.5, "39px " + BEBAS, INK, 0],
+  ["PLEASANT",   865, 906.5, "39px " + BEBAS, INK, 0],
+];
+
+/* [lines, x, y, deg, lineHeight, font, color, letterSpacing] */
+const ROTATED = [
+  [["It is"], 420, 415, 0, 95, "95px " + VERD, INK, 1.5],
+  [["what"], 635, 460, 46, 78, "78px " + VERD, INK, 1.5],
+  [["it is"], 680, 645, 90, 90, "90px " + VERD, INK, 3],
+  [["We are so", "fucking back"], 790, 295, 45, 62, "59px " + VERD, INK, 0],
+];
+
+/* [x1, y1, x2, y2, thickness, tips] — tips are two arrowhead triangles */
+const ARROWS = [
+  [153, 336, 153, 644, 7.5,
+    [[[153, 315], [140.5, 339.5], [165.5, 339.5]],
+     [[153, 665], [140.5, 640.5], [165.5, 640.5]]]],
+  [478, 910, 742, 910, 7.5,
+    [[[460, 910], [481, 897.5], [481, 922.5]],
+     [[760, 910], [739, 897.5], [739, 922.5]]]],
+];
+
+function drawDot(ctx, p) {
+  ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff"; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+  ctx.fillStyle = INK; ctx.fill();
+}
+
+function drawMeter(ctx, scale, dot, ghost) {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+  ctx.fillStyle = "#f6ede8";
+  ctx.fillRect(0, 0, 1000, 1000);
+
+  for (const z of ZONES) {
+    ctx.fillStyle = z[5];
+    ctx.fillRect(z[1], z[2], z[3], z[4]);
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const [t, x, y, font, color, ls] of TEXTS) {
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.letterSpacing = ls + "px";
+    ctx.fillText(t, x, y);
+  }
+  for (const [lines, x, y, deg, lh, font, color, ls] of ROTATED) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(deg * Math.PI / 180);
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.letterSpacing = ls + "px";
+    const top = -((lines.length - 1) * lh) / 2;
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 0, top + i * lh);
+    ctx.restore();
+  }
+  ctx.letterSpacing = "0px";
+
+  ctx.fillStyle = INK;
+  for (const [x1, y1, x2, y2, w, tips] of ARROWS) {
+    ctx.fillRect(Math.min(x1, x2) - w / 2, Math.min(y1, y2) - w / 2,
+                 Math.abs(x2 - x1) + w, Math.abs(y2 - y1) + w);
+    for (const tip of tips) {
+      ctx.beginPath();
+      ctx.moveTo(tip[0][0], tip[0][1]);
+      ctx.lineTo(tip[1][0], tip[1][1]);
+      ctx.lineTo(tip[2][0], tip[2][1]);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  if (ghost) {
+    ctx.globalAlpha = 0.35;
+    drawDot(ctx, ghost);
+    ctx.globalAlpha = 1;
+  }
+  if (dot) drawDot(ctx, dot);
+}
+
+/* ---------- app ---------- */
+
+const canvas = document.getElementById("meter");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const downloadBtn = document.getElementById("download");
+const copyBtn = document.getElementById("copy");
+
+let dot = null;
+let hover = null;
+let dragging = false;
+let flashTimer = 0;
+
+function redraw() {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.max(1, Math.round(canvas.clientWidth * dpr));
+  if (canvas.width !== size) {
+    canvas.width = size;
+    canvas.height = size;
+  }
+  drawMeter(ctx, size / 1000, dot, dragging ? null : hover);
+}
+
+function toMeter(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 1000;
+  const y = (e.clientY - r.top) / r.height * 1000;
+  return { x: Math.min(1000, Math.max(0, x)), y: Math.min(1000, Math.max(0, y)) };
+}
+
+function zoneAt(p) {
+  for (let i = ZONES.length - 1; i >= 0; i--) {
+    const z = ZONES[i];
+    if (p.x >= z[1] && p.x <= z[1] + z[3] && p.y >= z[2] && p.y <= z[2] + z[4]) return z;
+  }
+  return null;
+}
+
+function updateStatus() {
+  downloadBtn.disabled = copyBtn.disabled = !dot;
+  if (!dot) {
+    statusEl.innerHTML = "<span>Click on the meter to place your dot</span>";
+    return;
+  }
+  const pleasant = Math.round(dot.x / 10);
+  const energy = Math.round((1000 - dot.y) / 10);
+  const z = zoneAt(dot);
+  statusEl.innerHTML =
+    "<span>Pleasantness " + pleasant + "% · Energy " + energy + "%</span>" +
+    (z ? "<span class='mood'>" + z[6] + "</span>" : "");
+}
+
+function flash(msg) {
+  statusEl.innerHTML = "<span>" + msg + "</span>";
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(updateStatus, 2500);
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  dragging = true;
+  dot = toMeter(e);
+  redraw();
+  updateStatus();
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  const p = toMeter(e);
+  if (dragging) {
+    dot = p;
+    redraw();
+    updateStatus();
+  } else {
+    hover = p;
+    redraw();
+  }
+});
+
+canvas.addEventListener("pointerup", (e) => {
+  dragging = false;
+  hover = e.pointerType === "mouse" ? toMeter(e) : null;
+  redraw();
+});
+
+canvas.addEventListener("pointerleave", () => {
+  hover = null;
+  redraw();
+});
+
+canvas.addEventListener("pointercancel", () => {
+  dragging = false;
+  hover = null;
+  redraw();
+});
+
+function renderExportCanvas() {
+  const c = document.createElement("canvas");
+  c.width = 2000;
+  c.height = 2000;
+  drawMeter(c.getContext("2d"), 2, dot, null);
+  return c;
+}
+
+downloadBtn.addEventListener("click", () => {
+  renderExportCanvas().toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mood-meter.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+});
+
+copyBtn.addEventListener("click", async () => {
+  try {
+    const blob = await new Promise((res) => renderExportCanvas().toBlob(res, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    flash("Copied to clipboard");
+  } catch {
+    flash("Copy not supported here — use Download instead");
+  }
+});
+
+new ResizeObserver(redraw).observe(canvas);
+if (document.fonts) {
+  document.fonts.load('82px "Bebas Neue"').then(redraw).catch(() => {});
+  document.fonts.ready.then(redraw);
+}
+redraw();
+</script>
+
+</body>
+</html>

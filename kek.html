@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Mood Meter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #f6ede8;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Verdana, "DejaVu Sans", Geneva, sans-serif;
+    color: #111;
+  }
+
+  .meter {
+    position: relative;
+    width: min(95vw, 95vh);
+    aspect-ratio: 1 / 1;
+    background: #f6ede8;
+    container-type: size;
+    overflow: hidden;
+    user-select: none;
+  }
+  .meter > * { position: absolute; }
+
+  /* ---------- Condensed headings ---------- */
+  .cond {
+    font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .title {
+    top: -0.3%;
+    left: 20%;
+    width: 80%;
+    text-align: center;
+    font-size: 8.2cqw;
+    line-height: 1;
+  }
+
+  /* ---------- Coloured zones ---------- */
+  .zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .red      { left: 22%;   top: 9.7%;  width: 39.5%; height: 25%;   background: #8a2f27;
+              font-size: 7cqw; }
+  .tan      { left: 61.5%; top: 9.7%;  width: 38.5%; height: 39.3%; background: #f0cc84; }
+  /* Flush with the top-right corner of the tan zone */
+  .yellow   { left: 87%;   top: 9.7%;  width: 13%;   height: 12.1%; background: #f6e97a;
+              font-size: 1.35cqw; font-weight: 400; text-transform: uppercase; line-height: 1.4;
+              padding-bottom: 0.4cqw; }
+  .orange-h { left: 22%;   top: 34.7%; width: 51.2%; height: 14.4%; background: #f3a26c; }
+  .orange-v { left: 61.5%; top: 49%;   width: 11.7%; height: 38.5%; background: #f3a26c; }
+  .blue     { left: 22%;   top: 49%;   width: 39.5%; height: 38.5%; background: #a4b7d0;
+              font-size: 7.8cqw; align-items: flex-start; padding-top: 5.3cqw; }
+  .blue-sm  { left: 22%;   top: 75%;   width: 12.3%; height: 12.5%; background: #7d93ab;
+              font-size: 1.6cqw; font-weight: 600; line-height: 1.4; }
+  .green    { left: 73.2%; top: 49%;   width: 26.8%; height: 38.5%; background: #98a67d;
+              font-size: 7.6cqw; align-items: flex-start; padding-top: 5.3cqw; }
+  .purple   { left: 0;     top: 87.5%; width: 22%;   height: 12.5%; background: #4c4a86;
+              color: #0d0d1a; font-family: Arial, Helvetica, sans-serif; font-weight: 700;
+              font-size: 2.7cqw; line-height: 1.25; padding-bottom: 1.2cqw; }
+
+  /* ---------- Floating / rotated text (centered on a point) ---------- */
+  .txt {
+    font-size: 9.5cqw;
+    white-space: nowrap;
+    line-height: 1;
+    text-align: center;
+    letter-spacing: 0.15cqw;
+    transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+  }
+  .txt-itis  { left: 42%;   top: 41.5%; }
+  .txt-what  { left: 63.5%; top: 46%;   --r: 46deg; font-size: 7.8cqw; }
+  .txt-itis2 { left: 68%;   top: 64.5%; --r: 90deg; font-size: 9cqw; letter-spacing: 0.3cqw; }
+  .txt-back  { left: 79%;   top: 29.5%; --r: 45deg; font-size: 5.9cqw; line-height: 1.05;
+               letter-spacing: 0; }
+
+  /* ---------- Axis labels ---------- */
+  .axis { font-size: 3.9cqw; text-align: center; line-height: 1.05; }
+  .axis-high { left: 7%;  top: 20%;   width: 14%; }
+  .axis-low  { left: 7%;  top: 71.5%; width: 14%; }
+  .axis-unpl { left: 25%; top: 88.6%; width: 19%; }
+  .axis-pl   { left: 77%; top: 88.6%; width: 19%; }
+
+  .arrow-v { left: 12.8%; top: 31.5%; width: 5%;  height: 35%; }
+  .arrow-h { left: 46%;   top: 88.5%; width: 30%; height: 5%; }
+  svg { width: 100%; height: 100%; overflow: visible; display: block; }
+</style>
+</head>
+<body>
+
+<div class="meter">
+
+  <div class="title cond">The Mood Meter</div>
+
+  <!-- Zones -->
+  <div class="zone red">Fuck it<br>we ball</div>
+  <div class="zone tan"></div>
+  <div class="zone yellow">Lets Fucking<br>Goooooooo</div>
+  <div class="zone orange-h"></div>
+  <div class="zone orange-v"></div>
+  <div class="zone blue">It's so<br>over</div>
+  <div class="zone blue-sm">Mom would<br>be sad</div>
+  <div class="zone green">We<br>vibing</div>
+  <div class="zone purple">Hey guys<br>I guess that's it</div>
+
+  <!-- Floating text -->
+  <div class="txt txt-itis">It is</div>
+  <div class="txt txt-what">what</div>
+  <div class="txt txt-itis2">it is</div>
+  <div class="txt txt-back">We are so<br>fucking back</div>
+
+  <!-- Axis labels -->
+  <div class="axis cond axis-high">High<br>Energy</div>
+  <div class="axis cond axis-low">Low<br>Energy</div>
+  <div class="axis cond axis-unpl">Unpleasant</div>
+  <div class="axis cond axis-pl">Pleasant</div>
+
+  <!-- Vertical arrow -->
+  <div class="arrow-v">
+    <svg viewBox="0 0 20 200" preserveAspectRatio="none">
+      <line x1="10" y1="12" x2="10" y2="188" stroke="#111" stroke-width="3"/>
+      <polygon points="10,0 5,14 15,14" fill="#111"/>
+      <polygon points="10,200 5,186 15,186" fill="#111"/>
+    </svg>
+  </div>
+
+  <!-- Horizontal arrow -->
+  <div class="arrow-h">
+    <svg viewBox="0 0 200 20" preserveAspectRatio="none">
+      <line x1="12" y1="10" x2="188" y2="10" stroke="#111" stroke-width="3"/>
+      <polygon points="0,10 14,5 14,15" fill="#111"/>
+      <polygon points="200,10 186,5 186,15" fill="#111"/>
+    </svg>
+  </div>
+
+</div>
+
+</body>
+</html>
