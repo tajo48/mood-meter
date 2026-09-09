@@ -93,7 +93,7 @@
   <button id="download" disabled>Download PNG</button>
   <button id="copy" disabled>Copy image</button>
 </div>
-<div class="hint">Click or drag on the meter to place the dot — exports a 2000×2000 PNG</div>
+<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2000×2000 PNG</div>
 
 <script>
 "use strict";
@@ -114,7 +114,6 @@ const ZONES = [
   ["blue",     220, 490, 395, 385, "#a4b7d0", "It's so over"],
   ["blue-sm",  220, 750, 123, 125, "#7d93ab", "Mom would be sad"],
   ["green",    732, 490, 268, 385, "#98a67d", "We vibing"],
-  ["purple",     0, 875, 220, 125, "#4c4a86", "Hey guys I guess that's it"],
 ];
 
 /* [text, x, y, font, color, letterSpacing] */
@@ -135,9 +134,6 @@ const TEXTS = [
 
   ["We",     866, 586.7, "76px " + VERD, INK, 0],
   ["vibing", 866, 674.1, "76px " + VERD, INK, 0],
-
-  ["Hey guys",          110, 914.6, "700 27px Arial, Helvetica, sans-serif", "#0d0d1a", 0],
-  ["I guess that's it", 110, 948.4, "700 27px Arial, Helvetica, sans-serif", "#0d0d1a", 0],
 
   ["HIGH",       140, 220.5, "39px " + BEBAS, INK, 0],
   ["ENERGY",     140, 261.5, "39px " + BEBAS, INK, 0],
@@ -172,7 +168,7 @@ function drawDot(ctx, p) {
   ctx.fillStyle = INK; ctx.fill();
 }
 
-function drawMeter(ctx, scale, dot, ghost) {
+function drawMeter(ctx, scale, dot, ghost, purpleAlpha) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   ctx.fillStyle = "#f6ede8";
@@ -218,6 +214,22 @@ function drawMeter(ctx, scale, dot, ghost) {
     }
   }
 
+  /* Hidden zone: "Hey guys I guess that's it". Blank until the pointer tries
+     to click that corner; never included in the exported image. */
+  if (purpleAlpha > 0) {
+    ctx.globalAlpha = purpleAlpha;
+    ctx.fillStyle = "#4c4a86";
+    ctx.fillRect(0, 875, 220, 125);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "700 27px Arial, Helvetica, sans-serif";
+    ctx.fillStyle = "#0d0d1a";
+    ctx.letterSpacing = "0px";
+    ctx.fillText("Hey guys", 110, 914.6);
+    ctx.fillText("I guess that's it", 110, 948.4);
+    ctx.globalAlpha = 1;
+  }
+
   if (ghost) {
     ctx.globalAlpha = 0.35;
     drawDot(ctx, ghost);
@@ -238,6 +250,8 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let flashTimer = 0;
+let purpleAlpha = 0;
+let animating = false;
 
 function redraw() {
   const dpr = window.devicePixelRatio || 1;
@@ -246,7 +260,8 @@ function redraw() {
     canvas.width = size;
     canvas.height = size;
   }
-  drawMeter(ctx, size / 1000, dot, dragging ? null : hover);
+  const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
+  drawMeter(ctx, size / 1000, dot, ghost, purpleAlpha);
 }
 
 function toMeter(e) {
@@ -262,6 +277,31 @@ function zoneAt(p) {
     if (p.x >= z[1] && p.x <= z[1] + z[3] && p.y >= z[2] && p.y <= z[2] + z[4]) return z;
   }
   return null;
+}
+
+/* The hidden corner lives outside the graph: blank, unclickable, revealed
+   only while the pointer is over it (i.e. trying to click it). */
+function inPurple(p) {
+  return !!p && p.x <= 220 && p.y >= 875;
+}
+
+function kickAnimate() {
+  if (!animating && purpleAlpha !== (inPurple(hover) ? 1 : 0)) {
+    animating = true;
+    requestAnimationFrame(animate);
+  }
+}
+
+function animate() {
+  const target = inPurple(hover) ? 1 : 0;
+  purpleAlpha += (target - purpleAlpha) * 0.25;
+  if (Math.abs(target - purpleAlpha) < 0.01) purpleAlpha = target;
+  redraw();
+  if (purpleAlpha !== target) {
+    requestAnimationFrame(animate);
+  } else {
+    animating = false;
+  }
 }
 
 function updateStatus() {
@@ -285,40 +325,53 @@ function flash(msg) {
 }
 
 canvas.addEventListener("pointerdown", (e) => {
+  const p = toMeter(e);
+  hover = p;
+  if (!zoneAt(p)) {
+    // Blank space (including the hidden corner) isn't clickable.
+    kickAnimate();
+    redraw();
+    return;
+  }
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
   dragging = true;
-  dot = toMeter(e);
+  dot = p;
   redraw();
   updateStatus();
+  kickAnimate();
 });
 
 canvas.addEventListener("pointermove", (e) => {
   const p = toMeter(e);
-  if (dragging) {
+  hover = p;
+  canvas.style.cursor = zoneAt(p) ? "crosshair" : "default";
+  if (dragging && zoneAt(p)) {
     dot = p;
-    redraw();
     updateStatus();
-  } else {
-    hover = p;
-    redraw();
   }
+  kickAnimate();
+  redraw();
 });
 
 canvas.addEventListener("pointerup", (e) => {
   dragging = false;
   hover = e.pointerType === "mouse" ? toMeter(e) : null;
+  kickAnimate();
   redraw();
 });
 
 canvas.addEventListener("pointerleave", () => {
   hover = null;
+  canvas.style.cursor = "crosshair";
+  kickAnimate();
   redraw();
 });
 
 canvas.addEventListener("pointercancel", () => {
   dragging = false;
   hover = null;
+  kickAnimate();
   redraw();
 });
 
@@ -326,7 +379,8 @@ function renderExportCanvas() {
   const c = document.createElement("canvas");
   c.width = 2000;
   c.height = 2000;
-  drawMeter(c.getContext("2d"), 2, dot, null);
+  // The hidden corner is an on-page easter egg only — never exported.
+  drawMeter(c.getContext("2d"), 2, dot, null, 0);
   return c;
 }
 
