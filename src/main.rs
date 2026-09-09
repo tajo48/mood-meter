@@ -4,12 +4,26 @@ use std::thread;
 
 const INDEX: &str = include_str!("../index.html");
 
+const DEFAULT_HOST: &str = "127.0.0.1";
+const DEFAULT_PORT: u16 = 3002;
+
+const USAGE: &str = "\
+mood-meter — serves the mood meter
+
+USAGE: mood-meter [OPTIONS] [PORT]
+
+ARGS:
+    PORT                Port to listen on (default: 3002)
+
+OPTIONS:
+    -p, --port <PORT>   Port to listen on
+    -H, --host <HOST>   Address to bind (default: 127.0.0.1)
+    -h, --help          Print this help
+
+HOST/PORT environment variables provide the defaults; arguments win.";
+
 fn main() -> std::io::Result<()> {
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port: u16 = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(3002);
+    let (host, port) = parse_args();
 
     let listener = match TcpListener::bind((host.as_str(), port)) {
         Ok(listener) => listener,
@@ -30,6 +44,53 @@ fn main() -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn parse_args() -> (String, u16) {
+    let mut host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
+    let mut port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(DEFAULT_PORT);
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-h" | "--help" => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            "-p" | "--port" => match args.next() {
+                Some(v) => port = parse_port(&v),
+                None => fail("missing value for --port"),
+            },
+            "-H" | "--host" => match args.next() {
+                Some(v) => host = v,
+                None => fail("missing value for --host"),
+            },
+            other => {
+                if let Some(v) = other.strip_prefix("--port=") {
+                    port = parse_port(v);
+                } else if let Some(v) = other.strip_prefix("--host=") {
+                    host = v.to_string();
+                } else {
+                    port = parse_port(other);
+                }
+            }
+        }
+    }
+
+    (host, port)
+}
+
+fn parse_port(s: &str) -> u16 {
+    s.parse()
+        .unwrap_or_else(|_| fail(&format!("invalid port: {s:?}")))
+}
+
+fn fail(msg: &str) -> ! {
+    eprintln!("mood_meter: {msg}\n\n{USAGE}");
+    std::process::exit(2);
 }
 
 fn handle(mut stream: TcpStream) {
