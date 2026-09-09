@@ -9,7 +9,7 @@ fn main() -> std::io::Result<()> {
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
-        .unwrap_or(3000);
+        .unwrap_or(3002);
 
     let listener = match TcpListener::bind((host.as_str(), port)) {
         Ok(listener) => listener,
