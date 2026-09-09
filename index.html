@@ -86,14 +86,14 @@
 </head>
 <body>
 
-<div class="stage"><canvas id="meter" width="1000" height="1000"></canvas></div>
+<div class="stage"><canvas id="meter" width="1050" height="1050"></canvas></div>
 
 <div class="bar">
   <div class="status" id="status"><span>Click on the meter to place your dot</span></div>
   <button id="download" disabled>Download PNG</button>
   <button id="copy" disabled>Copy image</button>
 </div>
-<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2000×2000 PNG</div>
+<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2100×2100 PNG</div>
 
 <script>
 "use strict";
@@ -102,7 +102,12 @@ const INK = "#111";
 const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
 const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 
-/* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units). */
+/* Design replicated from kek.html on a 1000×1000 grid (1% = 10 units).
+   PAD_* adds a cream margin on the top/left so exports aren't edge-to-edge. */
+const PAD_X = 50;
+const PAD_Y = 50;
+const MW = 1000 + PAD_X;
+const MH = 1000 + PAD_Y;
 
 /* [name, x, y, w, h, fill, readout label] */
 const ZONES = [
@@ -169,10 +174,10 @@ function drawDot(ctx, p) {
 }
 
 function drawMeter(ctx, scale, dot, ghost, purpleAlpha) {
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, PAD_X * scale, PAD_Y * scale);
 
   ctx.fillStyle = "#f6ede8";
-  ctx.fillRect(0, 0, 1000, 1000);
+  ctx.fillRect(-PAD_X, -PAD_Y, MW, MH);
 
   for (const z of ZONES) {
     ctx.fillStyle = z[5];
@@ -252,6 +257,7 @@ let dragging = false;
 let flashTimer = 0;
 let purpleAlpha = 0;
 let animating = false;
+let purpleSelected = false;
 
 function redraw() {
   const dpr = window.devicePixelRatio || 1;
@@ -261,14 +267,18 @@ function redraw() {
     canvas.height = size;
   }
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
-  drawMeter(ctx, size / 1000, dot, ghost, purpleAlpha);
+  drawMeter(ctx, size / MW, dot, ghost, purpleAlpha);
+  canvas.style.cursor = hover
+    ? (zoneAt(hover) ? "crosshair" : (inPurple(hover) && purpleAlpha > 0.4 ? "pointer" : "default"))
+    : "crosshair";
 }
 
 function toMeter(e) {
   const r = canvas.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width * 1000;
-  const y = (e.clientY - r.top) / r.height * 1000;
-  return { x: Math.min(1000, Math.max(0, x)), y: Math.min(1000, Math.max(0, y)) };
+  return {
+    x: (e.clientX - r.left) / r.width * MW - PAD_X,
+    y: (e.clientY - r.top) / r.height * MH - PAD_Y,
+  };
 }
 
 function zoneAt(p) {
@@ -279,21 +289,26 @@ function zoneAt(p) {
   return null;
 }
 
-/* The hidden corner lives outside the graph: blank, unclickable, revealed
-   only while the pointer is over it (i.e. trying to click it). */
+/* The hidden corner lives outside the graph: blank until the pointer tries
+   to click it. Clicking it selects it so it exports with the image. */
 function inPurple(p) {
-  return !!p && p.x <= 220 && p.y >= 875;
+  return !!p && p.x >= 0 && p.x <= 220 && p.y >= 875 && p.y <= 1000;
+}
+
+function purpleTarget() {
+  if (purpleSelected) return 1;
+  return inPurple(hover) ? 0.75 : 0;
 }
 
 function kickAnimate() {
-  if (!animating && purpleAlpha !== (inPurple(hover) ? 1 : 0)) {
+  if (!animating && purpleAlpha !== purpleTarget()) {
     animating = true;
     requestAnimationFrame(animate);
   }
 }
 
 function animate() {
-  const target = inPurple(hover) ? 1 : 0;
+  const target = purpleTarget();
   purpleAlpha += (target - purpleAlpha) * 0.25;
   if (Math.abs(target - purpleAlpha) < 0.01) purpleAlpha = target;
   redraw();
@@ -327,8 +342,18 @@ function flash(msg) {
 canvas.addEventListener("pointerdown", (e) => {
   const p = toMeter(e);
   hover = p;
+  if (inPurple(p)) {
+    // Clicking the revealed corner selects it so it exports; clicking again hides it.
+    purpleSelected = !purpleSelected;
+    flash(purpleSelected
+      ? "Easter egg selected — it will appear in the export"
+      : "Easter egg deselected — exports without it");
+    kickAnimate();
+    redraw();
+    return;
+  }
   if (!zoneAt(p)) {
-    // Blank space (including the hidden corner) isn't clickable.
+    // Blank space isn't clickable.
     kickAnimate();
     redraw();
     return;
@@ -345,7 +370,6 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   const p = toMeter(e);
   hover = p;
-  canvas.style.cursor = zoneAt(p) ? "crosshair" : "default";
   if (dragging && zoneAt(p)) {
     dot = p;
     updateStatus();
@@ -363,7 +387,6 @@ canvas.addEventListener("pointerup", (e) => {
 
 canvas.addEventListener("pointerleave", () => {
   hover = null;
-  canvas.style.cursor = "crosshair";
   kickAnimate();
   redraw();
 });
@@ -377,10 +400,10 @@ canvas.addEventListener("pointercancel", () => {
 
 function renderExportCanvas() {
   const c = document.createElement("canvas");
-  c.width = 2000;
-  c.height = 2000;
-  // The hidden corner is an on-page easter egg only — never exported.
-  drawMeter(c.getContext("2d"), 2, dot, null, 0);
+  c.width = 2 * MW;
+  c.height = 2 * MH;
+  // The hidden corner exports only once it's been clicked (selected).
+  drawMeter(c.getContext("2d"), 2, dot, null, purpleSelected ? 1 : 0);
   return c;
 }
 
