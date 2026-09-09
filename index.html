@@ -131,15 +131,14 @@ function statsOf(p) {
   };
 }
 
-/* Download name carries the placement stats and a local timestamp,
-   e.g. mood-meter_2026-09-09_14-30_pleasant-67_energy-42.png. */
+/* Download name carries the placement stats and a day-month-year date,
+   e.g. Mood_09-09-26_p38_e30.png. */
 function exportFileName() {
   const s = statsOf(dot);
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
-  const stamp = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
-    + "_" + pad(d.getHours()) + "-" + pad(d.getMinutes());
-  return "mood-meter_" + stamp + "_pleasant-" + s.pleasant + "_energy-" + s.energy + ".png";
+  const date = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getFullYear() % 100);
+  return "Mood_" + date + "_p" + s.pleasant + "_e" + s.energy + ".png";
 }
 
 /* [name, x, y, w, h, fill, readout label] — the last four entries are the
