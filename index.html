@@ -11,7 +11,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: #f6ede8;
+    background: #232634;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -20,7 +20,7 @@
     gap: 16px;
     padding: 16px;
     font-family: Verdana, "DejaVu Sans", Geneva, sans-serif;
-    color: #111;
+    color: #c6d0f5;
   }
 
   .stage { width: min(92vw, 90vh); aspect-ratio: 1220 / 1050; }
@@ -51,8 +51,9 @@
     min-width: 300px;
     max-width: 92vw;
     padding: 8px 18px;
-    background: #111;
-    color: #f6ede8;
+    background: #414559;
+    color: #c6d0f5;
+    border: 2px solid #51576d;
     border-radius: 6px;
     font-size: 13px;
     line-height: 1.5;
@@ -61,6 +62,7 @@
   }
   .status .mood {
     font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+    color: #8caaee;
     font-size: 22px;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -71,17 +73,17 @@
     font-size: 22px;
     letter-spacing: 1px;
     text-transform: uppercase;
-    background: #111;
-    color: #f6ede8;
-    border: 2px solid #111;
+    background: #8caaee;
+    color: #292c3c;
+    border: 2px solid #8caaee;
     border-radius: 6px;
     padding: 10px 22px 7px;
     cursor: pointer;
   }
-  button:hover:not(:disabled) { background: transparent; color: #111; }
+  button:hover:not(:disabled) { background: transparent; color: #8caaee; }
   button:disabled { opacity: 0.35; cursor: default; }
 
-  .hint { font-size: 12px; opacity: 0.7; text-align: center; max-width: 92vw; }
+  .hint { font-size: 12px; color: #a5adce; text-align: center; max-width: 92vw; }
 </style>
 </head>
 <body>
@@ -98,7 +100,11 @@
 <script>
 "use strict";
 
-const INK = "#111";
+/* Catppuccin Frappé palette */
+const INK = "#c6d0f5";       /* text — margin/background elements */
+const INK_ZONE = "#292c3c";  /* mantle — text on the pastel zones */
+const BLUE = "#8caaee";
+const CRUST = "#232634";
 const VERD = "Verdana, 'DejaVu Sans', Geneva, sans-serif";
 const BEBAS = "'Bebas Neue', Impact, Haettenschweiler, 'Arial Narrow', sans-serif";
 
@@ -119,50 +125,50 @@ const GY1 = 97;    // meter y of energy 100
 
 /* [name, x, y, w, h, fill, readout label] */
 const ZONES = [
-  ["red",      220,  97, 395, 250, "#8a2f27", "Fuck it we ball"],
-  ["tan",      615,  97, 385, 393, "#f0cc84", "We are so fucking back"],
-  ["yellow",   870,  97, 130, 121, "#f6e97a", "Lets Fucking Goooooooo"],
-  ["orange-h", 220, 347, 512, 144, "#f3a26c", "It is what it is"],
-  ["orange-v", 615, 490, 117, 385, "#f3a26c", "It is what it is"],
-  ["blue",     220, 490, 395, 385, "#a4b7d0", "It's so over"],
-  ["blue-sm",  220, 750, 123, 125, "#7d93ab", "Mom would be sad"],
-  ["green",    732, 490, 268, 385, "#98a67d", "We vibing"],
-  ["purple",     0, 875, 220, 125, "#4c4a86", "Hey guys I guess that's it"],
+  ["red",      220,  97, 395, 250, "#e78284", "Fuck it we ball"],
+  ["tan",      615,  97, 385, 393, "#f2d5cf", "We are so fucking back"],
+  ["yellow",   870,  97, 130, 121, "#e5c890", "Lets Fucking Goooooooo"],
+  ["orange-h", 220, 347, 512, 144, "#ef9f76", "It is what it is"],
+  ["orange-v", 615, 490, 117, 385, "#ef9f76", "It is what it is"],
+  ["blue",     220, 490, 395, 385, "#8caaee", "It's so over"],
+  ["blue-sm",  220, 750, 123, 125, "#85c1dc", "Mom would be sad"],
+  ["green",    732, 490, 268, 385, "#a6d189", "We vibing"],
+  ["purple",     0, 875, 220, 125, "#ca9ee6", "Hey guys I guess that's it"],
 ];
 
 /* [text, x, y, font, color, letterSpacing] */
 const TEXTS = [
   ["THE MOOD METER", 600, 38, "82px " + BEBAS, INK, 0],
 
-  ["Fuck it", 417.5, 181.8, "70px " + VERD, INK, 0],
-  ["we ball", 417.5, 262.3, "70px " + VERD, INK, 0],
+  ["Fuck it", 417.5, 181.8, "70px " + VERD, INK_ZONE, 0],
+  ["we ball", 417.5, 262.3, "70px " + VERD, INK_ZONE, 0],
 
-  ["LETS FUCKING", 935, 146.1, "13.5px " + VERD, INK, 0],
-  ["GOOOOOOO",    935, 165.0, "13.5px " + VERD, INK, 0],
+  ["LETS FUCKING", 935, 146.1, "13.5px " + VERD, INK_ZONE, 0],
+  ["GOOOOOOO",    935, 165.0, "13.5px " + VERD, INK_ZONE, 0],
 
-  ["It's so", 417.5, 587.9, "78px " + VERD, INK, 0],
-  ["over",    417.5, 677.6, "78px " + VERD, INK, 0],
+  ["It's so", 417.5, 587.9, "78px " + VERD, INK_ZONE, 0],
+  ["over",    417.5, 677.6, "78px " + VERD, INK_ZONE, 0],
 
-  ["Mom would", 281.5, 801.3, "600 16px " + VERD, INK, 0],
-  ["be sad",    281.5, 823.7, "600 16px " + VERD, INK, 0],
+  ["Mom would", 281.5, 801.3, "600 16px " + VERD, INK_ZONE, 0],
+  ["be sad",    281.5, 823.7, "600 16px " + VERD, INK_ZONE, 0],
 
-  ["We",     866, 586.7, "76px " + VERD, INK, 0],
-  ["vibing", 866, 674.1, "76px " + VERD, INK, 0],
+  ["We",     866, 586.7, "76px " + VERD, INK_ZONE, 0],
+  ["vibing", 866, 674.1, "76px " + VERD, INK_ZONE, 0],
 
-  ["HIGH",       140, 220.5, "39px " + BEBAS, INK, 0],
-  ["ENERGY",     140, 261.5, "39px " + BEBAS, INK, 0],
-  ["LOW",        140, 735.5, "39px " + BEBAS, INK, 0],
-  ["ENERGY",     140, 776.5, "39px " + BEBAS, INK, 0],
-  ["UNPLEASANT", 345, 906.5, "39px " + BEBAS, INK, 0],
-  ["PLEASANT",   865, 906.5, "39px " + BEBAS, INK, 0],
+  ["HIGH",       140, 220.5, "39px " + BEBAS, BLUE, 0],
+  ["ENERGY",     140, 261.5, "39px " + BEBAS, BLUE, 0],
+  ["LOW",        140, 735.5, "39px " + BEBAS, BLUE, 0],
+  ["ENERGY",     140, 776.5, "39px " + BEBAS, BLUE, 0],
+  ["UNPLEASANT", 345, 906.5, "39px " + BEBAS, BLUE, 0],
+  ["PLEASANT",   865, 906.5, "39px " + BEBAS, BLUE, 0],
 ];
 
 /* [lines, x, y, deg, lineHeight, font, color, letterSpacing] */
 const ROTATED = [
-  [["It is"], 420, 415, 0, 95, "95px " + VERD, INK, 1.5],
-  [["what"], 635, 460, 46, 78, "78px " + VERD, INK, 1.5],
-  [["it is"], 680, 645, 90, 90, "90px " + VERD, INK, 3],
-  [["We are so", "fucking back"], 790, 295, 45, 62, "59px " + VERD, INK, 0],
+  [["It is"], 420, 415, 0, 95, "95px " + VERD, INK_ZONE, 1.5],
+  [["what"], 635, 460, 46, 78, "78px " + VERD, INK_ZONE, 1.5],
+  [["it is"], 680, 645, 90, 90, "90px " + VERD, INK_ZONE, 3],
+  [["We are so", "fucking back"], 790, 295, 45, 62, "59px " + VERD, INK_ZONE, 0],
 ];
 
 /* [x1, y1, x2, y2, thickness, tips] — tips are two arrowhead triangles */
@@ -177,15 +183,15 @@ const ARROWS = [
 
 function drawDot(ctx, p) {
   ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
-  ctx.fillStyle = "#fff"; ctx.fill();
-  ctx.beginPath(); ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
   ctx.fillStyle = INK; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+  ctx.fillStyle = CRUST; ctx.fill();
 }
 
 function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
   ctx.setTransform(sx, 0, 0, sy, 0, PAD_T * sy);
 
-  ctx.fillStyle = "#f6ede8";
+  ctx.fillStyle = "#303446";
   ctx.fillRect(0, -PAD_T, MW, MH);
 
   for (const z of ZONES) {
@@ -215,7 +221,7 @@ function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
   }
   ctx.letterSpacing = "0px";
 
-  ctx.fillStyle = INK;
+  ctx.fillStyle = BLUE;
   for (const [x1, y1, x2, y2, w, tips] of ARROWS) {
     ctx.fillRect(Math.min(x1, x2) - w / 2, Math.min(y1, y2) - w / 2,
                  Math.abs(x2 - x1) + w, Math.abs(y2 - y1) + w);
@@ -233,12 +239,12 @@ function drawMeter(ctx, sx, sy, dot, ghost, purpleAlpha) {
      the dot is on it; exports only when the dot is placed there. */
   if (purpleAlpha > 0) {
     ctx.globalAlpha = purpleAlpha;
-    ctx.fillStyle = "#4c4a86";
+    ctx.fillStyle = "#ca9ee6";
     ctx.fillRect(0, 875, 220, 125);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "700 27px Arial, Helvetica, sans-serif";
-    ctx.fillStyle = "#0d0d1a";
+    ctx.fillStyle = INK_ZONE;
     ctx.letterSpacing = "0px";
     ctx.fillText("Hey guys", 110, 914.6);
     ctx.fillText("I guess that's it", 110, 948.4);
