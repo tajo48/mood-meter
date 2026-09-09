@@ -144,7 +144,7 @@ fn handle(mut stream: TcpStream) {
         match path {
             "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", INDEX),
             "/sw.js" => ("200 OK", "text/javascript; charset=utf-8", SW_JS),
-            "/manifest.webmanifest" => (
+            "/manifest.json" => (
                 "200 OK",
                 "application/manifest+json; charset=utf-8",
                 MANIFEST,
