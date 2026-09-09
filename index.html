@@ -110,6 +110,13 @@ const PAD_T = 50;
 const MW = 1000 + PAD_R;
 const MH = 1000 + PAD_T;
 
+/* Readout axes: origin (0;0) at the "Mom would be sad" corner of the graph,
+   so the hidden easter-egg corner beyond it reads as negative values. */
+const GX0 = 220;   // meter x of pleasantness 0
+const GY0 = 875;   // meter y of energy 0
+const GX1 = 1000;  // meter x of pleasantness 100
+const GY1 = 97;    // meter y of energy 100
+
 /* [name, x, y, w, h, fill, readout label] */
 const ZONES = [
   ["red",      220,  97, 395, 250, "#8a2f27", "Fuck it we ball"],
@@ -323,8 +330,8 @@ function updateStatus() {
     statusEl.innerHTML = "<span>Click on the meter to place your dot</span>";
     return;
   }
-  const pleasant = Math.round(dot.x / 10);
-  const energy = Math.round((1000 - dot.y) / 10);
+  const pleasant = Math.round((dot.x - GX0) / (GX1 - GX0) * 100);
+  const energy = Math.round((GY0 - dot.y) / (GY0 - GY1) * 100);
   const z = zoneAt(dot);
   statusEl.innerHTML =
     "<span>Pleasantness " + pleasant + "% · Energy " + energy + "%</span>" +
