@@ -617,11 +617,18 @@ function flash(msg) {
 
 /* Some mobile browsers drop or swallow pointerdown. Track pressed pointers
    at the window level so a press that starts off-chart (or gets lost) can
-   still place the dot when it slides onto a zone. */
+   still place the dot when it slides onto a zone; also end the drag when
+   the last pointer is released outside the canvas. */
 const activePointers = new Set();
 window.addEventListener("pointerdown", (e) => activePointers.add(e.pointerId), true);
-window.addEventListener("pointerup", (e) => activePointers.delete(e.pointerId), true);
-window.addEventListener("pointercancel", (e) => activePointers.delete(e.pointerId), true);
+window.addEventListener("pointerup", (e) => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size === 0) dragging = false;
+}, true);
+window.addEventListener("pointercancel", (e) => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size === 0) dragging = false;
+}, true);
 
 canvas.addEventListener("pointerdown", (e) => {
   const p = toPoint(e);
@@ -650,9 +657,10 @@ canvas.addEventListener("pointermove", (e) => {
   hover = p;
   if (dragging) {
     dragTarget = p; // the dot glides after it in animate()
-  } else if (activePointers.size > 0 && e.pointerType !== "mouse" && zoneAt(p)) {
+  } else if (activePointers.size > 0 && zoneAt(p)) {
     /* pointerdown was lost or landed on blank space: the first zone hit
-       mid-gesture places the dot, so dragging in from off-chart works. */
+       mid-gesture places the dot, so dragging in from off-chart works
+       for mouse and touch alike. */
     dragging = true;
     dot = p;
     dragTarget = p;
