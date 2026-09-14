@@ -419,8 +419,8 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let dragTarget = null; // where the dot glides toward while/after dragging
-let dotR = 26; // dot radius in meter units; grows on small screens (see redraw)
-const EXPORT_DOT_R = 13; // dot radius on exports, in meter units — half the live dot
+let dotR = 22; // dot radius in meter units; grows on small screens (see redraw)
+const EXPORT_DOT_R = 16; // dot radius on exports, in meter units
 let lastFrameTs = 0;
 let glideStuck = 0;
 let flashTimer = 0;
@@ -436,7 +436,7 @@ function redraw() {
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   /* Keep the dot plainly visible on phones: at least 15 css px of radius. */
-  dotR = Math.max(26, (15 * dpr) / (w / MW));
+  dotR = Math.max(22, (15 * dpr) / (w / MW));
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
   drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz, false, dotR);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
