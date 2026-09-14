@@ -107,6 +107,13 @@
     letter-spacing: 1px;
     text-transform: uppercase;
   }
+  .status .flash {
+    font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
+    color: #8caaee;
+    font-size: 26px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
 
   button {
     font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
@@ -419,6 +426,7 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let dragTarget = null; // where the dot glides toward while/after dragging
+let direct = false;    // tap-to-move glides straight to the target
 let dotR = 22; // dot radius in meter units; capped on small screens (see redraw)
 const EXPORT_DOT_R = 26; // ≈ the phone dot in meter units (7.5 css px on a ~350 px canvas)
 let lastFrameTs = 0;
@@ -510,8 +518,15 @@ function slideWithin(from, to, spans) {
 /* One frame of the dot chasing the drag target: instead of freezing in
    blank space and snapping when the pointer re-enters a zone, it glides
    along tile edges — and never leaves the tiles. */
-const GLIDE_SPEED = 5000; // meter units per second
-const GLIDE_PULL = 0.5;   // fraction of the remaining distance per frame
+const GLIDE_SMOOTH = 15; // smoothing per second: higher = snappier follow
+
+/* Frame-rate-independent exponential approach: velocity is proportional to
+   the remaining distance, so the glide is steady at any frame rate and
+   eases in and out — no sudden halts or jumps. */
+function smoothToward(from, to, dt) {
+  const k = 1 - Math.exp((-GLIDE_SMOOTH * dt) / 1000);
+  return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
+}
 
 function glideStep(dt) {
   const t = dragTarget;
@@ -520,9 +535,9 @@ function glideStep(dt) {
   const dy = t.y - dot.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 0.75) return false;
-  const step = Math.min(dist, Math.max(2, dist * GLIDE_PULL), (GLIDE_SPEED * dt) / 1000);
-  let tx = dot.x + (dx / dist) * step;
-  let ty = dot.y + (dy / dist) * step;
+  const p = smoothToward(dot, t, dt);
+  let tx = p.x;
+  let ty = p.y;
   // Slide the dominant axis first so diagonals glide around corners.
   if (Math.abs(dx) >= Math.abs(dy)) {
     tx = slideWithin(dot.x, tx, mergedSpans(spansAt(dot.y, "x")));
@@ -533,6 +548,20 @@ function glideStep(dt) {
   }
   if (tx === dot.x && ty === dot.y) return false;
   dot = { x: tx, y: ty };
+  return true;
+}
+
+/* One frame of a tap-to-move glide: straight from the dot to the clicked
+   point, no detours — tiles and blank space alike are crossed directly. */
+function directStep(dt) {
+  if (!dragTarget || !dot) return false;
+  const dist = Math.hypot(dragTarget.x - dot.x, dragTarget.y - dot.y);
+  if (dist < 0.75) {
+    dragTarget = null;
+    direct = false;
+    return false;
+  }
+  dot = smoothToward(dot, dragTarget, dt);
   return true;
 }
 
@@ -565,7 +594,7 @@ function animate(ts) {
   const dt = lastFrameTs ? Math.min(50, ts - lastFrameTs) : 16.7;
   lastFrameTs = ts;
 
-  const moved = glideStep(dt);
+  const moved = direct ? directStep(dt) : glideStep(dt);
   if (moved) glideStuck = 0;
   else if (dragTarget && dot) glideStuck++;
   else glideStuck = 0;
@@ -608,7 +637,7 @@ function updateStatus() {
 }
 
 function flash(msg) {
-  const html = "<span>" + msg + "</span><span class='mood'>\u00a0</span>";
+  const html = "<span class='flash'>" + msg + "</span><span class='mood'>\u00a0</span>";
   lastStatusHTML = html;
   statusEl.innerHTML = html;
   clearTimeout(flashTimer);
@@ -636,6 +665,7 @@ canvas.addEventListener("pointerdown", (e) => {
   if (!zoneAt(p)) {
     // Blank space isn't clickable.
     dragTarget = null;
+    direct = false;
     kickAnimate();
     redraw();
     return;
@@ -643,7 +673,8 @@ canvas.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   dragging = true;
   dragTarget = p;
-  if (!dot) dot = p; // first placement is instant; later ones glide to it
+  direct = true; // glide straight from the dot to the clicked spot
+  if (!dot) dot = p; // first placement is instant
   // Capture can throw if the pointer is already inactive — the dot is
   // placed by now, so a failure must not undo the tap.
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -656,13 +687,19 @@ canvas.addEventListener("pointermove", (e) => {
   const p = toPoint(e);
   hover = p;
   if (dragging) {
-    dragTarget = p; // the dot glides after it in animate()
+    if (direct && Math.hypot(p.x - dragTarget.x, p.y - dragTarget.y) < 12) {
+      // still a tap: tiny finger wobble keeps the straight glide
+    } else {
+      dragTarget = p; // the dot glides after it in animate()
+      direct = false; // a real drag follows the finger along the tile edges
+    }
   } else if (activePointers.size > 0 && zoneAt(p)) {
     /* pointerdown was lost or landed on blank space: the first zone hit
        mid-gesture places the dot, so dragging in from off-chart works
        for mouse and touch alike. */
     dragging = true;
     dragTarget = p;
+    direct = true;
     if (!dot) dot = p;
     updateStatus();
   }
@@ -679,6 +716,7 @@ canvas.addEventListener("pointerup", (e) => {
     const p = toPoint(e);
     if (zoneAt(p)) {
       dragTarget = p;
+      direct = true;
       if (!dot) dot = p;
       updateStatus();
     }
@@ -698,6 +736,7 @@ canvas.addEventListener("pointerleave", () => {
 canvas.addEventListener("pointercancel", () => {
   dragging = false;
   dragTarget = null;
+  direct = false;
   hover = null;
   kickAnimate();
   redraw();
