@@ -1,11 +1,12 @@
 "use strict";
 
 /* Offline support for the mood meter: the core assets are precached so the
-   app works with no network, navigations serve the cached copy and refresh
-   it in the background, and Google-Fonts requests are cached as they happen.
-   All paths are relative, so the worker works at any URL depth. */
+   app works with no network, navigations are network-first so a newly
+   deployed version shows up on the first reload (cache only as a fallback),
+   and Google-Fonts requests are cached as they happen. All paths are
+   relative, so the worker works at any URL depth. */
 
-const VERSION = "1";
+const VERSION = "2";
 const CORE = "mood-core-" + VERSION;
 const FONTS = "mood-fonts-" + VERSION;
 
@@ -56,25 +57,22 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
 
-  // App shell: serve cached instantly, refresh the cache in the background.
+  // App shell: network-first, cache only when offline.
   if (e.request.mode === "navigate") {
     e.respondWith(
       (async () => {
         const cache = await caches.open(CORE);
-        const cached =
-          (await cache.match("./index.html", { ignoreSearch: true })) ||
-          (await cache.match("./", { ignoreSearch: true }));
-        const fresh = fetch(e.request)
-          .then((res) => {
-            if (res.ok) cache.put("./index.html", res.clone());
-            return res;
-          })
-          .catch(() => null);
-        return (
-          cached ||
-          (await fresh) ||
-          new Response("offline", { status: 503, headers: { "Content-Type": "text/plain" } })
-        );
+        try {
+          const res = await fetch(e.request);
+          if (res.ok) cache.put("./index.html", res.clone());
+          return res;
+        } catch {
+          return (
+            (await cache.match("./index.html", { ignoreSearch: true })) ||
+            (await cache.match("./", { ignoreSearch: true })) ||
+            new Response("offline", { status: 503, headers: { "Content-Type": "text/plain" } })
+          );
+        }
       })()
     );
     return;
