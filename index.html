@@ -642,8 +642,8 @@ canvas.addEventListener("pointerdown", (e) => {
   }
   e.preventDefault();
   dragging = true;
-  dot = p;
   dragTarget = p;
+  if (!dot) dot = p; // first placement is instant; later ones glide to it
   // Capture can throw if the pointer is already inactive — the dot is
   // placed by now, so a failure must not undo the tap.
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -662,8 +662,8 @@ canvas.addEventListener("pointermove", (e) => {
        mid-gesture places the dot, so dragging in from off-chart works
        for mouse and touch alike. */
     dragging = true;
-    dot = p;
     dragTarget = p;
+    if (!dot) dot = p;
     updateStatus();
   }
   kickAnimate();
@@ -678,8 +678,8 @@ canvas.addEventListener("pointerup", (e) => {
   if (!wasDragging && e.pointerType !== "mouse") {
     const p = toPoint(e);
     if (zoneAt(p)) {
-      dot = p;
       dragTarget = p;
+      if (!dot) dot = p;
       updateStatus();
     }
   }
