@@ -419,8 +419,8 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let dragTarget = null; // where the dot glides toward while/after dragging
-let dotR = 22; // dot radius in meter units; grows on small screens (see redraw)
-const EXPORT_DOT_R = 16; // dot radius on exports, in meter units
+let dotR = 22; // dot radius in meter units; capped on small screens (see redraw)
+const EXPORT_DOT_R = 24; // dot radius on exports, in meter units
 let lastFrameTs = 0;
 let glideStuck = 0;
 let flashTimer = 0;
@@ -435,8 +435,12 @@ function redraw() {
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
-  /* Keep the dot plainly visible on phones: at least 15 css px of radius. */
-  dotR = Math.max(22, (15 * dpr) / (w / MW));
+  /* Desktop keeps the 22-unit dot. On phones that unit-based dot balloons
+     relative to the chart (the old 10 css px floor was the culprit), so
+     cap it at 2.5 css px of radius — a quarter of that floor. 554 is
+     where 22 units render to exactly 10 css px. */
+  const cw = Math.max(1, canvas.clientWidth);
+  dotR = cw < 554 ? 2.5 * MW / cw : 22;
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
   drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz, false, dotR);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
