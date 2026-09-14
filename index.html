@@ -314,7 +314,7 @@ function drawDot(ctx, p, r) {
   ctx.fillStyle = CRUST; ctx.fill();
 }
 
-function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz, credit) {
+function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz, credit, r) {
   ctx.setTransform(sx, 0, 0, sy, 0, PAD_T * sy);
 
   ctx.fillStyle = "#303446";
@@ -401,10 +401,10 @@ function drawMeter(ctx, sx, sy, dot, ghost, alphas, zzz, credit) {
 
   if (ghost) {
     ctx.globalAlpha = 0.35;
-    drawDot(ctx, ghost, dotR);
+    drawDot(ctx, ghost, r);
     ctx.globalAlpha = 1;
   }
-  if (dot) drawDot(ctx, dot, dotR);
+  if (dot) drawDot(ctx, dot, r);
 }
 
 /* ---------- app ---------- */
@@ -419,7 +419,8 @@ let dot = null;
 let hover = null;
 let dragging = false;
 let dragTarget = null; // where the dot glides toward while/after dragging
-let dotR = 30; // dot radius in meter units; grows on small screens (see redraw)
+let dotR = 26; // dot radius in meter units; grows on small screens (see redraw)
+const EXPORT_DOT_R = 13; // dot radius on exports, in meter units — half the live dot
 let lastFrameTs = 0;
 let glideStuck = 0;
 let flashTimer = 0;
@@ -435,9 +436,9 @@ function redraw() {
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   /* Keep the dot plainly visible on phones: at least 15 css px of radius. */
-  dotR = Math.max(30, (15 * dpr) / (w / MW));
+  dotR = Math.max(26, (15 * dpr) / (w / MW));
   const ghost = !dragging && hover && zoneAt(hover) ? hover : null;
-  drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz);
+  drawMeter(ctx, w / MW, h / MH, dot, ghost, hiddenAlpha, zzz, false, dotR);
   canvas.style.cursor = hover && zoneAt(hover) ? "crosshair" : "default";
 }
 
@@ -611,6 +612,14 @@ function flash(msg) {
   flashTimer = setTimeout(updateStatus, 2500);
 }
 
+/* Some mobile browsers drop or swallow pointerdown. Track pressed pointers
+   at the window level so a press that starts off-chart (or gets lost) can
+   still place the dot when it slides onto a zone. */
+const activePointers = new Set();
+window.addEventListener("pointerdown", (e) => activePointers.add(e.pointerId), true);
+window.addEventListener("pointerup", (e) => activePointers.delete(e.pointerId), true);
+window.addEventListener("pointercancel", (e) => activePointers.delete(e.pointerId), true);
+
 canvas.addEventListener("pointerdown", (e) => {
   const p = toPoint(e);
   hover = p;
@@ -622,10 +631,12 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   e.preventDefault();
-  canvas.setPointerCapture(e.pointerId);
   dragging = true;
   dot = p;
   dragTarget = p;
+  // Capture can throw if the pointer is already inactive — the dot is
+  // placed by now, so a failure must not undo the tap.
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   redraw();
   updateStatus();
   kickAnimate();
@@ -634,13 +645,33 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   const p = toPoint(e);
   hover = p;
-  if (dragging) dragTarget = p; // the dot glides after it in animate()
+  if (dragging) {
+    dragTarget = p; // the dot glides after it in animate()
+  } else if (activePointers.size > 0 && e.pointerType !== "mouse" && zoneAt(p)) {
+    /* pointerdown was lost or landed on blank space: the first zone hit
+       mid-gesture places the dot, so dragging in from off-chart works. */
+    dragging = true;
+    dot = p;
+    dragTarget = p;
+    updateStatus();
+  }
   kickAnimate();
   redraw();
 });
 
 canvas.addEventListener("pointerup", (e) => {
+  const wasDragging = dragging;
   dragging = false;
+  /* Same quirk: if pointerdown never arrived, a tap that lands on a zone
+     must still place the dot. */
+  if (!wasDragging && e.pointerType !== "mouse") {
+    const p = toPoint(e);
+    if (zoneAt(p)) {
+      dot = p;
+      dragTarget = p;
+      updateStatus();
+    }
+  }
   // dragTarget stays behind, so the dot finishes its glide after release.
   hover = e.pointerType === "mouse" ? toPoint(e) : null;
   kickAnimate();
@@ -671,7 +702,7 @@ function renderExportCanvas() {
   const dz = zoneAt(dot);
   const alphas = {};
   for (const k of HIDDEN) alphas[k] = dz && dz[0] === k ? 1 : 0;
-  drawMeter(c.getContext("2d"), 2, 2, dot, null, alphas, zzz, true);
+  drawMeter(c.getContext("2d"), 2, 2, dot, null, alphas, zzz, true, EXPORT_DOT_R);
   return c;
 }
 
