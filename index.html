@@ -869,7 +869,24 @@ if (isIOS && !("onbeforeinstallprompt" in window)) {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      // Installed PWAs can stay open for days without a normal navigation,
+      // which is the only time browsers otherwise bother re-checking sw.js.
+      // Poke it whenever the app regains focus, and every 30 minutes while open.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update().catch(() => {});
+      });
+      setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+    }).catch(() => {});
+  });
+
+  // Once a new service worker takes control, the page it controls is still
+  // running old JS in memory — reload once so the update actually shows up.
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swRefreshing) return;
+    swRefreshing = true;
+    window.location.reload();
   });
 }
 </script>
