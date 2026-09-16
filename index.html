@@ -101,9 +101,8 @@
     user-select: none;
   }
 
-  /* Both lines share one fixed line-height and never wrap, so the box
-     cannot change size when a flash message replaces the stats line. */
-  .status span { line-height: 33px; white-space: nowrap; }
+  /* The two lines never wrap, so a flash message can't change the box size. */
+  .status span { white-space: nowrap; }
 
   .status .mood {
     font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
@@ -115,7 +114,7 @@
   .status .flash {
     font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
     color: #8caaee;
-    font-size: 26px;
+    font-size: 22px;
     letter-spacing: 1px;
     text-transform: uppercase;
   }
@@ -641,7 +640,10 @@ function updateStatus() {
 }
 
 function flash(msg) {
-  const html = "<span class='flash'>" + msg + "</span><span class='mood'>\u00a0</span>";
+  /* Keep the stats line and swap the blue mood line, so the box keeps its
+     exact size in every state. */
+  const top = statusEl.firstElementChild ? statusEl.firstElementChild.outerHTML : "<span></span>";
+  const html = top + "<span class='flash'>" + msg + "</span>";
   lastStatusHTML = html;
   statusEl.innerHTML = html;
   clearTimeout(flashTimer);
