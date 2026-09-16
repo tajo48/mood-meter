@@ -6,7 +6,7 @@
    and Google-Fonts requests are cached as they happen. All paths are
    relative, so the worker works at any URL depth. */
 
-const VERSION = "3";
+const VERSION = "4";
 const CORE = "mood-core-" + VERSION;
 const FONTS = "mood-fonts-" + VERSION;
 
