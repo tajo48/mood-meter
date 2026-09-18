@@ -88,9 +88,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 300px;
+    width: 340px;
     max-width: 92vw;
     padding: 8px 18px;
+    min-height: 73px; /* two 13px/22px lines + padding + borders, so the empty state keeps the placed state's height */
     background: #414559;
     color: #c6d0f5;
     border: 2px solid #51576d;
@@ -111,6 +112,12 @@
     letter-spacing: 1px;
     text-transform: uppercase;
   }
+  /* Empty state: collapse the blank mood line, enlarge the message, and
+     park it just below center — where the stats line will appear — while
+     the box keeps its two-line size. */
+  .status:has(.mood.empty) { justify-content: flex-start; padding-top: 22px; }
+  .status:has(.mood.empty) span:first-child { font-size: 15px; }
+  .status .mood.empty { font-size: 0; }
   .status .flash {
     font-family: "Bebas Neue", Impact, Haettenschweiler, "Arial Narrow", sans-serif;
     color: #8caaee;
@@ -188,11 +195,12 @@
 <div class="stage"><canvas id="meter" width="1220" height="1050"></canvas></div>
 
 <div class="bar">
-  <div class="status" id="status"><span>Click on the meter to place your dot</span><span class="mood">&nbsp;</span></div>
+  <div class="status" id="status"><span>Click on the meter to place your dot</span><span class="mood empty">&nbsp;</span></div>
   <button id="download" disabled>Download PNG</button>
   <button id="copy" disabled>Copy image</button>
+  <button id="share" disabled hidden>Share</button>
 </div>
-<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · exports a 2440×2100 PNG</div>
+<div class="hint">Click or drag on the graph to place the dot — blank space doesn't count · export, copy or share a 2440×2100 PNG</div>
 
 <div class="install-pill" id="installPill" hidden>
   <button class="install-accept" id="installAccept" type="button">Install</button>
@@ -424,6 +432,7 @@ const ctx = canvas.getContext("2d");
 const statusEl = document.getElementById("status");
 const downloadBtn = document.getElementById("download");
 const copyBtn = document.getElementById("copy");
+const shareBtn = document.getElementById("share");
 
 let dot = null;
 let hover = null;
@@ -624,7 +633,7 @@ function animate(ts) {
 let lastStatusHTML = "";
 
 function updateStatus() {
-  downloadBtn.disabled = copyBtn.disabled = !dot;
+  downloadBtn.disabled = copyBtn.disabled = shareBtn.disabled = !dot;
   let top = "Click on the meter to place your dot";
   let mood = "\u00a0";
   if (dot) {
@@ -633,7 +642,7 @@ function updateStatus() {
     const z = zoneAt(dot);
     if (z) mood = z[6];
   }
-  const html = "<span>" + top + "</span><span class='mood'>" + mood + "</span>";
+  const html = "<span>" + top + "</span><span class='mood" + (dot ? "" : " empty") + "'>" + mood + "</span>";
   if (html === lastStatusHTML) return; // glide frames often change nothing
   lastStatusHTML = html;
   statusEl.innerHTML = html;
@@ -775,6 +784,16 @@ downloadBtn.addEventListener("click", () => {
   }, "image/png");
 });
 
+/* When the platform can share image files (installed PWA, or desktop
+   Chrome/Edge), the Share button joins Download + Copy; otherwise it stays
+   hidden and the other two cover everything. */
+const canShareFiles =
+  typeof navigator.share === "function" &&
+  typeof navigator.canShare === "function" &&
+  typeof File !== "undefined" &&
+  navigator.canShare({ files: [new File(["x"], "x.png", { type: "image/png" })] });
+if (canShareFiles) shareBtn.hidden = false;
+
 copyBtn.addEventListener("click", async () => {
   try {
     const blob = await new Promise((res) => renderExportCanvas().toBlob(res, "image/png"));
@@ -785,12 +804,29 @@ copyBtn.addEventListener("click", async () => {
   }
 });
 
+shareBtn.addEventListener("click", async () => {
+  const s = statsOf(dot);
+  try {
+    const blob = await new Promise((res) => renderExportCanvas().toBlob(res, "image/png"));
+    await navigator.share({
+      files: [new File([blob], exportFileName(), { type: "image/png" })],
+      title: "Mood Meter",
+      text: "Pleasantness " + s.pleasant + "% · Energy " + s.energy + "%",
+    });
+    flash("Shared");
+  } catch (err) {
+    if (err.name === "AbortError") return; // sheet dismissed — do nothing
+    flash("Share failed");
+  }
+});
+
 new ResizeObserver(redraw).observe(canvas);
 if (document.fonts) {
   document.fonts.load('82px "Bebas Neue"').then(redraw).catch(() => {});
   document.fonts.ready.then(redraw);
 }
 redraw();
+updateStatus(); // sync button state + the empty-state mood line on load
 
 /* ---------- install prompt ---------- */
 

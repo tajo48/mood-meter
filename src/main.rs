@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::OnceLock;
 use std::thread;
 
 /* Every asset the site consists of, baked into the binary. */
@@ -32,6 +33,34 @@ OPTIONS:
     -h, --help          Print this help
 
 HOST/PORT environment variables provide the defaults; arguments win.";
+
+/* Stamp for the service worker version. GitHub Actions replaces it with the
+   commit sha when deploying; locally we replace it with a hash of the served
+   assets so every rebuild yields a fresh sw.js the browser must re-fetch. */
+const SW_VERSION_PLACEHOLDER: &str = "@@VERSION@@";
+
+static SW_JS_SERVED: OnceLock<Vec<u8>> = OnceLock::new();
+
+fn sw_js_served() -> &'static [u8] {
+    SW_JS_SERVED.get_or_init(|| {
+        // FNV-1a over every baked asset: any content change → new version.
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for asset in [
+            INDEX, SW_JS, MANIFEST, FAVICON_SVG, FAVICON_PNG, APPLE_TOUCH, ICON_192, ICON_512,
+            ICON_192_MASKABLE, ICON_512_MASKABLE,
+        ] {
+            for &byte in asset {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        let version = format!("{hash:016x}");
+        std::str::from_utf8(SW_JS)
+            .expect("sw.js must be valid UTF-8")
+            .replace(SW_VERSION_PLACEHOLDER, &version)
+            .into_bytes()
+    })
+}
 
 fn main() -> std::io::Result<()> {
     let (host, port) = parse_args();
@@ -143,7 +172,7 @@ fn handle(mut stream: TcpStream) {
     let (status, content_type, body): (&str, &str, &[u8]) = if method == "GET" || method == "HEAD" {
         match path {
             "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", INDEX),
-            "/sw.js" => ("200 OK", "text/javascript; charset=utf-8", SW_JS),
+            "/sw.js" => ("200 OK", "text/javascript; charset=utf-8", sw_js_served()),
             "/manifest.json" => (
                 "200 OK",
                 "application/manifest+json; charset=utf-8",
@@ -163,7 +192,7 @@ fn handle(mut stream: TcpStream) {
     };
 
     let response = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(response.as_bytes());
