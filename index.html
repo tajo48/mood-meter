@@ -35,7 +35,11 @@
     justify-content: center;
     justify-content: safe center; /* don't clip the top when overflowing */
     gap: 16px;
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding:
+      calc(16px + env(safe-area-inset-top, 0px))
+      calc(16px + env(safe-area-inset-right, 0px))
+      calc(16px + env(safe-area-inset-bottom, 0px))
+      calc(16px + env(safe-area-inset-left, 0px));
     font-family: Verdana, "DejaVu Sans", Geneva, sans-serif;
     color: #c6d0f5;
     overflow: hidden;
@@ -47,8 +51,8 @@
      Width caps: 92vw, 90dvh, and "whatever is left of the viewport after
      the bar and hint below" (stage height = width / 1.162). */
   .stage {
-    width: min(92vw, 90vh, calc((100vh - 170px) * 1.162));
-    width: min(92vw, 90dvh, calc((100dvh - 170px) * 1.162));
+    width: min(92vw, 90vh, calc((100vh - 170px - env(safe-area-inset-top, 0px)) * 1.162));
+    width: min(92vw, 90dvh, calc((100dvh - 170px - env(safe-area-inset-top, 0px)) * 1.162));
     aspect-ratio: 1220 / 1050;
     background: #303446;
     border: 2px solid #51576d;
@@ -59,8 +63,8 @@
   /* Below ~720px the bar wraps to two rows and the hint to two lines. */
   @media (max-width: 720px) {
     .stage {
-      width: min(92vw, calc((100vh - 235px - env(safe-area-inset-bottom, 0px)) * 1.162));
-      width: min(92vw, calc((100dvh - 235px - env(safe-area-inset-bottom, 0px)) * 1.162));
+      width: min(92vw, calc((100vh - 235px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 1.162));
+      width: min(92vw, calc((100dvh - 235px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 1.162));
     }
   }
 
