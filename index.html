@@ -941,6 +941,21 @@ if ("serviceWorker" in navigator) {
     window.location.reload();
   });
 }
+
+/* Installed PWAs launch standalone on the first open after install (the
+   manifest's fullscreen mode only applies from the next cold start), so
+   promote to fullscreen on the first tap of that session. Skipped in a
+   normal browser tab so the page never hijacks the browser UI. */
+if (
+  !document.fullscreenElement &&
+  document.documentElement.requestFullscreen &&
+  matchMedia("(display-mode: standalone)").matches
+) {
+  const goFullscreen = () => {
+    document.documentElement.requestFullscreen().catch(() => {});
+  };
+  addEventListener("pointerdown", goFullscreen, { once: true, capture: true });
+}
 </script>
 
 </body>
