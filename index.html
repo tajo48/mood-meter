@@ -22,6 +22,8 @@
      to leave room for the bar and hint below. */
   html {
     height: 100%;
+    height: 100dvh; /* follow the real visible surface (fullscreen bar hide) */
+    background: #232634; /* no flash of black when the viewport resizes */
     overflow: hidden;
     overscroll-behavior: none;
   }
