@@ -913,6 +913,9 @@ if (isIOS && !("onbeforeinstallprompt" in window)) {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").then((reg) => {
+      // Check for an update right away; controllerchange below reloads when
+      // the new worker takes over, so a fresh launch never lags a deploy.
+      reg.update().catch(() => {});
       // Installed PWAs can stay open for days without a normal navigation,
       // which is the only time browsers otherwise bother re-checking sw.js.
       // Poke it whenever the app regains focus, and every 30 minutes while open.
