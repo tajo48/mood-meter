@@ -975,6 +975,22 @@ addEventListener("pageshow", syncViewport);
 document.addEventListener("visibilitychange", syncViewport);
 window.visualViewport?.addEventListener("resize", syncViewport);
 for (const delay of [100, 300, 800, 1500, 3000]) setTimeout(syncViewport, delay);
+
+/* Deeper workaround for the same cold-start bug: minimize/reopen or rotation
+   makes Chrome recompute the immersive window state, so a fullscreen
+   enter/exit toggle is used as the programmatic equivalent. Tried once
+   shortly after load (usually rejected without a gesture) and again on the
+   first tap, which the browser accepts. */
+async function nudgeImmersive() {
+  try {
+    await document.documentElement.requestFullscreen();
+    await document.exitFullscreen();
+  } catch {}
+}
+if (matchMedia("(display-mode: fullscreen)").matches) {
+  setTimeout(nudgeImmersive, 500);
+  addEventListener("pointerdown", nudgeImmersive, { once: true, capture: true });
+}
 </script>
 
 </body>
